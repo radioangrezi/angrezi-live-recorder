@@ -1,0 +1,105 @@
+body, html {
+	background: #141414;
+	color: rgb(240,240,240);
+}
+
+body {
+	padding: 2em;
+}
+
+body, h1, h2, h3, h4, h5, h6, p, span, button, input {
+	font-size: 12px;
+	font-family: Courier, monospace;
+	letter-spacing: 0.1em;
+	-webkit-font-smoothing: antialiased;
+	font-weight: normal;
+	margin: 0;
+}
+
+.label {
+	text-transform: uppercase;
+	font-size: 10px;
+	margin: 0.3em 0;
+	opacity: 0.5;
+}
+
+small {
+	font-size: 0.7em;
+	text-decoration: underline;
+	font-weight: normal;
+}
+
+.box {
+	border: 2px solid white;
+	box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+	width: 300px;
+	min-height: 50px;
+	margin: 4em 2em 2em 0;
+	position: relative;
+	padding: 1px;
+	box-shadow:
+    10px 10px 0 0px #fff;
+}
+
+.box .module-label {
+	top: -2em;
+	left: 0;
+	position: absolute;
+}
+
+button, .button {
+	width: 100%;
+	display: inline-block;
+    border: none;
+    padding: 1rem 2rem;
+    margin: 0;
+    text-decoration: none;
+    background: #0069ed;
+    color: #ffffff;
+    font-size: 1rem;
+    cursor: pointer;
+    text-align: center;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    font-weight: bold;
+	box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    outline: 1px solid #fff;
+    outline-offset: -5px;
+}
+
+.button > p {
+	font-weight: bold;
+	font-size: 14px;
+}
+
+.module-row {
+	width: 100%;
+    min-height: 50px;
+    margin-bottom: 1px;
+}
+
+.output {
+	background: transparent;
+	color: white;
+	display: inline-block;
+	box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    border: none;
+    height: 100px;
+    max-width: 100%;
+}
+
+.status {
+	background: gray;
+	height: 100px;
+	text-align: center;
+	vertical-align: center;
+  	line-height: 100px;
+	font-weight: bold;
+	font-size: 14px;
+}
