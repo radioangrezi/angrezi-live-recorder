@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <meta name="description" content="Angrezi Controller">
+        <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+        <title>Angrezi Controller</title>
+        <link href="frontend.css" rel="stylesheet"/>
+        <script type="text/javascript">
+
+            function reset_recordning(){
+
+                fetch('http://angrezistudio.hfk-bremen.de:5000/reset', {mode: 'no-cors'})
+                .then((res) => {
+                    console.log(res)
+                    document.querySelector("#live-recorder > .output").innerHTML = res.responseText
+                })
+                .catch((error) => console.log(error))
+
+            }
+
+        </script>
+    </head>
+    <body>
+        <header>
+            <h1>Radio Angrezi <span>Controller</span></h1>
+        </header>
+        <main>
+            <section id="live-recorder">
+                <h1>Live Recorder</h1>
+                <button class="button" onclick="reset_recordning()">
+                    <p>Start New Recording</p>
+                </button>
+                <p>Attention! This action can not be revoked.</p>
+                <textarea readonly="readonly" class="output"></textarea>
+            </section>
+        </main>
+    </body>
+</html>
