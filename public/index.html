@@ -29,7 +29,7 @@
 
                 update_status: function(){
                     var module_parent = this
-                    fetch('http://server.radioangrezi.de/proxy/controller/')
+                    fetch('/proxy/live-recorder/')
                     .then((res) => {
                         return res.json().then(function (data) {
                             live_recorder.status_elem.innerHTML = data.text
@@ -49,7 +49,7 @@
 
                 reset_recordning: function(){
 
-                    fetch('http://server.radioangrezi.de/proxy/controller/reset')
+                    fetch('/proxy/live-recorder/reset')
                     .then((res) => {
                         return res.text().then(function (text) {
                             live_recorder.status_elem.style = "background: #66FF00";
