@@ -6,19 +6,67 @@
         <meta name="description" content="Angrezi Controller">
         <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
         <title>Angrezi Controller</title>
-        <link href="frontend.css" rel="stylesheet"/>
+        <link href="normalize.css" rel="stylesheet"/>
+        <link href="controller.css" rel="stylesheet"/>
         <script type="text/javascript">
 
-            function reset_recordning(){
+        window.onload = function () {
 
-                fetch('http://angrezistudio.hfk-bremen.de:5000/reset', {mode: 'no-cors'})
-                .then((res) => {
-                    console.log(res)
-                    document.querySelector("#live-recorder > .output").innerHTML = res.responseText
-                })
-                .catch((error) => console.log(error))
+            window.live_recorder = {
 
-            }
+                status_elem: document.querySelector("#live-recorder p.status"),
+                button_elem: document.querySelector("#live-recorder .button"),
+                output_elem: document.querySelector("#live-recorder textarea.output"),
+
+                log: function(text){
+                    console.log(text)
+                    var d = new Date()
+                    var n = d.toLocaleTimeString()
+                    live_recorder.output_elem.value += n + ": " + text + "\n"
+                    // scroll to bottom
+                    live_recorder.output_elem.scrollTop = live_recorder.output_elem.scrollHeight;
+                },
+
+                update_status: function(){
+                    var module_parent = this
+                    fetch('http://angrezistudio.hfk-bremen.de:5000/')
+                    .then((res) => {
+                        return res.json().then(function (data) {
+                            live_recorder.status_elem.innerHTML = data.text
+                            if(data.status < 0){
+                                live_recorder.status_elem.style = "background: yellow; color: black;";
+                            }else if(data.status == 0){
+                                live_recorder.status_elem.style = "background: gray";
+                            }else if(data.status == 1){
+                                live_recorder.status_elem.style = "background: red";
+                            } if(data.status > 1){
+                                live_recorder.status_elem.style = "background: blue";
+                            }
+                        });
+                    })
+                    .catch((error) => live_recorder.log(error))
+                },
+
+                reset_recordning: function(){
+
+                    fetch('http://angrezistudio.hfk-bremen.de:5000/reset')
+                    .then((res) => {
+                        return res.text().then(function (text) {
+                            live_recorder.log(text)
+                        });
+                    })
+                    .catch((error) => live_recorder.log(error))
+
+                },
+
+                init: function() {
+                    var recorder_interval = window.setInterval(this.update_status, 1000);
+                    return this;
+                }
+
+            }.init();
+
+        };
 
         </script>
     </head>
@@ -27,13 +75,15 @@
             <h1>Radio Angrezi <span>Controller</span></h1>
         </header>
         <main>
-            <section id="live-recorder">
-                <h1>Live Recorder</h1>
-                <button class="button" onclick="reset_recordning()">
+            <section id="live-recorder" class="box">
+                <h2 class="module-label label">Live Recorder</h2>
+                <p class="status module-row">IDLE</p>
+                <button class="button module-row" onclick="live_recorder.reset_recordning()">
                     <p>Start New Recording</p>
+                    <small>Attention! Can't be undone.</small>
                 </button>
-                <p>Attention! This action can not be revoked.</p>
-                <textarea readonly="readonly" class="output"></textarea>
+                <h3 class="label">Output</h3>
+                <textarea readonly="readonly" class="output textarea module-row"></textarea>
             </section>
         </main>
     </body>
