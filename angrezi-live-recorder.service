@@ -1,0 +1,15 @@
+[Unit]
+Description=Angrezi Live Recorder with Remote Cutting
+
+[Service]
+Type=simple
+ExecStart=/var/angrezi/live-recorder/venv/bin/python /var/angrezi/live-recorder/recorder.py -d stream_in_16 -t PCM_16 "%%Y/%%m/%%d/studio-live-%Y-%m-%d-%H-%M-%S.wav"
+WorkingDirectory=/media/storage/recordings/Studio-Live/
+User=root
+
+TimeoutStopSec=10
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

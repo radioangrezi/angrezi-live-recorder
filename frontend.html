@@ -52,6 +52,7 @@
                     fetch('http://angrezistudio.hfk-bremen.de:5000/reset')
                     .then((res) => {
                         return res.text().then(function (text) {
+                            live_recorder.status_elem.style = "background: #66FF00";
                             live_recorder.log(text)
                         });
                     })
@@ -78,9 +79,10 @@
             <section id="live-recorder" class="box">
                 <h2 class="module-label label">Live Recorder</h2>
                 <p class="status module-row">IDLE</p>
-                <button class="button module-row" onclick="live_recorder.reset_recordning()">
+                <button class="button module-row doubleclick" ondblclick="live_recorder.reset_recordning()">
+                    <small>( double click )</small>
                     <p>Start New Recording</p>
-                    <small>Attention! Can't be undone.</small>
+                    <small class="warning">Attention! Can't be undone.</small>
                 </button>
                 <h3 class="label">Output</h3>
                 <textarea readonly="readonly" class="output textarea module-row"></textarea>

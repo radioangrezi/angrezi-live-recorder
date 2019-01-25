@@ -25,8 +25,12 @@ body, h1, h2, h3, h4, h5, h6, p, span, button, input {
 
 small {
 	font-size: 0.7em;
-	text-decoration: underline;
 	font-weight: normal;
+}
+
+.warning {
+	font-style: italic;
+	text-decoration: underline;
 }
 
 .box {
@@ -67,8 +71,9 @@ button, .button {
 	box-sizing: border-box;
     -moz-box-sizing: border-box;
     -webkit-box-sizing: border-box;
-    outline: 1px solid #fff;
+    outline: 2px double #fff;
     outline-offset: -5px;
+    height: 100px;
 }
 
 .button > p {

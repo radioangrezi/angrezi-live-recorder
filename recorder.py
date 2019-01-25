@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Create a recording with arbitrary duration.
-
-PySoundFile (https://github.com/bastibe/PySoundFile/) has to be installed!
-
+"""Create a recording with arbitrary duration. Allows remote triggerd cuts via HTTP request.
 """
 import argparse
 import tempfile
@@ -15,6 +12,7 @@ from flask import Flask
 from flask import jsonify
 from flask import request
 from enum import Enum
+import os, sys
 
 def int_or_str(text):
     """Helper function for argument parsing."""
@@ -34,14 +32,15 @@ parser.add_argument(
     '-r', '--samplerate', type=int, default=44100, help='sampling rate')
 parser.add_argument(
     '-c', '--channels', type=int, default=2, help='number of input channels')
-#parser.add_argument(
-#    'filename', nargs='?', metavar='FILENAME',
-#    help='audio file to store recording to')
+parser.add_argument(
+    'filename', nargs=1, metavar='FILENAME', help='audio file to store recording to')
 parser.add_argument(
     '-t', '--subtype', type=str, help='sound file subtype (e.g. "PCM_24")')
 parser.add_argument(
     '-p', '--port', type=int, help='web server port', default=5000)
 args = parser.parse_args()
+
+# recording states
 
 class STATES(Enum):
     ERROR = -2
@@ -59,6 +58,10 @@ recording_state = STATES.IDLE
 # super simple flask web api
 
 app = Flask(__name__)
+
+import logging
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 @app.route("/")
 def state():
@@ -128,7 +131,10 @@ try:
 
     i = 0
     while True:
-        filename = datetime.now().strftime("studio-live-%Y-%m-%d-%H-%M-%S.wav")
+        filename = datetime.now().strftime(args.filename[0])
+        directory = os.path.dirname(filename)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
         if record_to_file(filename) != -1:
             break
         i = i + 1
