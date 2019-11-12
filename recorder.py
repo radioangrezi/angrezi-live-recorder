@@ -39,7 +39,7 @@ parser.add_argument(
     '-d', '--device', type=int_or_str,
     help='input device (numeric ID or substring)')
 parser.add_argument(
-    '-r', '--samplerate', type=int, default=4400, help='sampling rate')
+    '-r', '--samplerate', type=int, default=44100, help='sampling rate')
 parser.add_argument(
     '-c', '--channels', type=int, default=2, help='number of input channels')
 parser.add_argument(
