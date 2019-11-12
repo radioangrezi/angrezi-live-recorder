@@ -1,9 +1,9 @@
 [Unit]
-Description=Angrezi Live Recorder with Remote Cutting
+Description=Angrezi Live Recorder with remote cutting
 
 [Service]
 Type=simple
-ExecStart=/var/angrezi/live-recorder/venv/bin/python /var/angrezi/live-recorder/recorder.py -d stream_in_16 -t PCM_16 "%%Y/%%m/%%d/studio-live-%%Y-%%m-%%d-%%H-%%M-%%S.wav"
+ExecStart=/var/angrezi/live-recorder/venv/bin/python /var/angrezi/live-recorder/recorder.py -d stream_in_16 -t PCM_16 -r 44100 -p 5000 "%%Y/%%m/%%d/studio-live-%%Y-%%m-%%d-%%H-%%M-%%S.wav"
 WorkingDirectory=/media/storage/recordings/Studio-Live/
 User=root
 
