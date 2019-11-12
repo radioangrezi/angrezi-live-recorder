@@ -77,7 +77,7 @@ api_server = None
 
 # WEB API - super simple flask server
 
-def api_server(interrupt, recording_state, recording_start_timestamp, port=5000):
+def run_api_server(interrupt, recording_state, recording_start_timestamp, port=5000):
 
     app = Flask(__name__)
     cors = CORS(app, resources={r"/*": {"origins": "*"}})
@@ -104,7 +104,7 @@ def api_server(interrupt, recording_state, recording_start_timestamp, port=5000)
 def start_api_server(port=5000):
     global api_server
     if __name__ == "__main__":
-        api_server = multiprocessing.Process(target=api_server, args=(interrupt, recording_state, recording_start_timestamp), kwargs={'port':port})
+        api_server = multiprocessing.Process(target=run_api_server, args=(interrupt, recording_state, recording_start_timestamp), kwargs={'port':port})
         api_server.start()
 
 # AUDIO RECORDER - based on https://python-sounddevice.readthedocs.io/en/0.3.12/examples.html#recording-with-arbitrary-duration
@@ -163,6 +163,7 @@ try:
                     # enforce a hard limit on the file size (wav max: ~ 4 GB)
                     data_size = file.frames * frame_size
                     log.debug("Current data size: %i" % data_size)
+                    # log.debug("Current data size: %i" % data_size)
                     if interrupt.is_set() or data_size >= max_data_size:
                         interrupt.clear()
                         log.info("making cut")
