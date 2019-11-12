@@ -162,7 +162,6 @@ try:
                 while True:
                     # enforce a hard limit on the file size (wav max: ~ 4 GB)
                     data_size = file.frames * frame_size
-                    log.debug("Current data size: %i" % data_size)
                     # log.debug("Current data size: %i" % data_size)
                     if interrupt.is_set() or data_size >= max_data_size:
                         interrupt.clear()
