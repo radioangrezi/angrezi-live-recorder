@@ -73,38 +73,23 @@ def set_recording_state(enum):
 def get_recording_state_enum(state):
     return STATES(state.value)
 
+#recording_filename = multiprocessing.Value('s', 0)
+
+# WEB API in a seperate process
+
+from app import flaskThread
+shared = {}
+shared['interrupt'] = interrupt
+shared['recording_start_timestamp'] = recording_start_timestamp
+shared['recording_state'] = recording_state
+#shared['recording_filename'] = recording_filename
+shared['STATES'] = STATES
+
 api_server = None
-
-# WEB API - super simple flask server
-
-def api_server(interrupt, recording_state, recording_start_timestamp, port=5000):
-
-    app = Flask(__name__)
-    cors = CORS(app, resources={r"/*": {"origins": "*"}})
-
-    log = logging.getLogger('werkzeug')
-    log.setLevel(logging.INFO)
-
-    @app.route("/")
-    def state():
-        t = get_recording_state_enum(recording_state).name
-        if get_recording_state_enum(recording_state) is STATES.RECORDING:
-            t = "%s: %s" % (STATES.RECORDING.name, datetime.now() - datetime.fromtimestamp(recording_start_timestamp.value))
-        return jsonify({'status': get_recording_state_enum(recording_state).value, 'text': t})
-
-    @app.route("/reset")
-    def reset():
-        interrupt.set()
-        log.info("api: cut requested")
-        return jsonify({'status': get_recording_state_enum(recording_state).value, 'text': 'cut requested'})
-
-    # start (in Process)
-    app.run(port=port, host='0.0.0.0')
-
 def start_api_server(port=5000):
     global api_server
     if __name__ == "__main__":
-        api_server = multiprocessing.Process(target=api_server, args=(interrupt, recording_state, recording_start_timestamp), kwargs={'port':port})
+        api_server = multiprocessing.Process(target=flaskThread, kwargs={'shared':shared,'port':port})
         api_server.start()
 
 # AUDIO RECORDER - based on https://python-sounddevice.readthedocs.io/en/0.3.12/examples.html#recording-with-arbitrary-duration

@@ -11,3 +11,7 @@ should work with Python 2.7 and 3
 ### Mac
 
 `python recorder.py -d 0 rec-test-%Y-%m-%d-%H-%M-%S.wav`
+
+### Dev
+
+Webserver only: `flask run`
