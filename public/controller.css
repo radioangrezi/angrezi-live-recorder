@@ -1,6 +1,6 @@
 body, html {
-	background: #141414;
-	color: rgb(240,240,240);
+	background: #000;
+	color: rgb(255,255,0);
 }
 
 body {
@@ -9,7 +9,7 @@ body {
 
 body, h1, h2, h3, h4, h5, h6, p, span, button, input {
 	font-size: 12px;
-	font-family: Courier, monospace;
+	font-family: "Terminal Grotesque", Courier, monospace;
 	letter-spacing: 0.1em;
 	-webkit-font-smoothing: antialiased;
 	font-weight: normal;
@@ -34,17 +34,18 @@ small {
 }
 
 .box {
-	border: 2px solid white;
+	border: 1px solid yellow;
 	box-sizing: border-box;
     -moz-box-sizing: border-box;
     -webkit-box-sizing: border-box;
 	width: 300px;
-	min-height: 50px;
-	margin: 4em 2em 2em 0;
+	min-height: 20px;
+	margin: 1em 2em 2em 0;
 	position: relative;
 	padding: 1px;
-	box-shadow:
-    10px 10px 0 0px #fff;
+/*	box-shadow:
+    10px 10px 0 0px #fff;*/
+    color: white;
 }
 
 .box .module-label {
@@ -60,7 +61,6 @@ button, .button {
     padding: 1rem 2rem;
     margin: 0;
     text-decoration: none;
-    background: #0069ed;
     color: #ffffff;
     font-size: 1rem;
     cursor: pointer;
@@ -76,6 +76,16 @@ button, .button {
     height: 100px;
 }
 
+.btn-blue {
+    background: #0069ed;
+}
+.btn-red {
+    background: red;
+}
+.btn-grey {
+    background: grey;
+}
+
 .button > p {
 	font-weight: bold;
 	font-size: 14px;
@@ -83,7 +93,7 @@ button, .button {
 
 .module-row {
 	width: 100%;
-    min-height: 50px;
+    min-height: 20px;
     margin-bottom: 1px;
 }
 
@@ -101,10 +111,22 @@ button, .button {
 
 .status {
 	background: gray;
-	height: 100px;
+	height: 70px;
 	text-align: center;
 	vertical-align: center;
-  	line-height: 100px;
-	font-weight: bold;
-	font-size: 14px;
+  	line-height: 70px;
+  	font-weight: normal;
+	/*font-family: "Sporting Grotesque";*/
+	font-size: 12px;
+}
+
+dt {
+  float: left;
+  clear: left;
+  margin-right: 5px;
+  font-weight: bold;
+}
+
+dd {
+  margin-left: 0px;
 }
