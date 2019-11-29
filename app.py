@@ -8,6 +8,8 @@
 # TODO: Stop recording when disconectin etc.
 # TODO: enhance frontend
 # TODO: README + minimal docs
+# start with name already, or start idle
+# logik und states vereinfachen: wenn conneted, dann record, sonst nix. zack feddisch.
 
 # TODO: v2 cleanup api
 # TODO: v2 reimplement frontend with react / backbone
@@ -37,11 +39,26 @@ app.config['SECRET_KEY'] = 'YQbv2CkMndeRe5dE'
 
 import logging
 log = logging.getLogger('werkzeug')
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.WARNING)
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 
 shared_with_recording_process = None
+
+#########
+# HELPERS
+#########
+
+def slugify(value):
+    """
+    Normalizes string, converts to lowercase, removes non-alpha characters,
+    and converts spaces to hyphens.
+    """
+    import unicodedata, re
+    value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
+    value = unicode(re.sub('[^\w\s-]', '', value).strip().lower())
+    value = unicode(re.sub('[-\s]+', '-', value))
+    return value
 
 #########
 # DIRECT AIRTIME API "PROXY"
@@ -76,7 +93,7 @@ def get_bootstrap_info():
     return Response(json.dumps(response), status=200, mimetype='application/json')
 
 #########
-# ACTIONS x not used
+# ACTIONS: not used in production
 #########
 
 @app.route("/disconect-master/")
@@ -108,7 +125,6 @@ def get_status_summary():
 
 def get_recorder_status():
     from datetime import datetime
-    STATES = shared_with_recording_process['STATES']
     recording_state = shared_with_recording_process['recording_state'].value
     recording_start_datetime = datetime.fromtimestamp(shared_with_recording_process['recording_start_timestamp'].value)
     label = STATES(recording_state).name
@@ -116,27 +132,39 @@ def get_recorder_status():
         label = "%s: %s" % (STATES.RECORDING.name, str(datetime.now() - recording_start_datetime).split('.')[0])
     return { 'status': recording_state, 'text': label}
 
+def get_show_name_and_send_to_pipe():
+    live_info = airtime_api.get_live_info()
+    if live_info and live_info['currentShow'] and live_info['currentShow'][0] and live_info['currentShow'][0]['name']:
+        name = slugify(live_info['currentShow'][0]['name'])
+        shared_with_recording_process['recording_filename_send'].send(name)
+
 @app.route("/recording-request-cut/")
-# send filename
 def cut():
+    get_show_name_and_send_to_pipe()
     shared_with_recording_process['interrupt'].set()
     return "Cut requested."
 
 @app.route("/recording-disconnect-stop/")
 def disconnect_stop():
+    shared_with_recording_process['recording_on_off'].value = False
+    shared_with_recording_process['interrupt'].set()
     response = airtime_api.notify_source_status('master_dj', 'false')
     # gives no response on success or failure :/
     return Response("Disconnection of Master Source (master_dj) requested.", status=200, mimetype='application/json')
 
 @app.route("/recording-connect-start/")
 def connect_start():
+    get_show_name_and_send_to_pipe()
+    shared_with_recording_process['recording_on_off'].value = True
     response = airtime_api.notify_source_status('master_dj', 'true')
     # gives no response on success or failure :/
     return Response("Connection of Master Source (master_dj) requested.", status=200, mimetype='application/json')
 
 def flaskThread(port=None, shared=None):
-    global shared_with_recording_process
+    global shared_with_recording_process, STATES
     shared_with_recording_process = shared
+    STATES = shared_with_recording_process['STATES']
+    get_show_name_and_send_to_pipe()
     try:
         port = port or args.port
     except NameError:

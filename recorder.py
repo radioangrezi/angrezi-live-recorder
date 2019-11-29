@@ -8,9 +8,6 @@ import signal
 from datetime import datetime
 import time
 import threading
-from flask import Flask
-from flask import jsonify
-from flask import request
 from enum import Enum
 import os, sys
 from flask_cors import CORS
@@ -68,12 +65,13 @@ def set_recording_timestamp(timestamp):
     recording_start_timestamp.value = timestamp
 
 recording_state = multiprocessing.Value('i', 0)
+recording_on_off = multiprocessing.Value('i', 0)
 def set_recording_state(enum):
     recording_state.value = enum.value
 def get_recording_state_enum(state):
     return STATES(state.value)
 
-#recording_filename = multiprocessing.Value('s', 0)
+recording_filename_recv , recording_filename_send = multiprocessing.Pipe(duplex=False)
 
 # WEB API in a seperate process
 
@@ -82,10 +80,12 @@ shared = {}
 shared['interrupt'] = interrupt
 shared['recording_start_timestamp'] = recording_start_timestamp
 shared['recording_state'] = recording_state
-#shared['recording_filename'] = recording_filename
+shared['recording_filename_send'] = recording_filename_send
+shared['recording_on_off'] = recording_on_off
 shared['STATES'] = STATES
 
 api_server = None
+
 def start_api_server(port=5000):
     global api_server
     if __name__ == "__main__":
@@ -110,6 +110,7 @@ try:
         print("error: no FILENAME argument provided. Use -h for help.")
         parser.exit(0)
 
+    # only start api server if port argument is set. just record if not.
     if args.port:
         start_api_server(port=args.port)
 
@@ -150,10 +151,10 @@ try:
                     log.debug("Current data size: %i" % data_size)
                     if interrupt.is_set() or data_size >= max_data_size:
                         interrupt.clear()
-                        log.info("making cut")
-                        set_recording_state(STATES.STOPPED)
-                        log.info('Recording finished: ' + repr(filename))
+                        log.info("Recorder: making cut")
+                        log.info('Recorder: Finished file ' + repr(filename))
                         file.close()
+                        set_recording_state(STATES.IDLE)
                         return -1
                     else:
                         set_recording_state(STATES.RECORDING)
@@ -163,11 +164,22 @@ try:
 
     i = 0
     while True:
+        # add date and time to filename
         filename = datetime.now().strftime(args.filename)
+
+        # get show name from pipe and add to filename if available
+        if recording_filename_recv.poll():
+            recording_filename = recording_filename_recv.recv()
+            if recording_filename and recording_filename is not "":
+                name, extension = os.path.splitext(filename)
+                filename = name + "_" + recording_filename + extension
+
         directory = os.path.dirname(filename) or os.getcwd()
         if not os.path.exists(directory):
             os.makedirs(directory)
-        if record_to_file(filename) != -1:
+        # print i
+        # record as long as the (requested) on / off is not off. (False)
+        if recording_on_off.value and record_to_file(filename) != -1:
             break
         i = i + 1
 
@@ -177,7 +189,6 @@ except KeyboardInterrupt:
         api_server.join()
 
     set_recording_state(STATES.ERROR)
-    print('\nRecording finished: ' + repr(filename))
     parser.exit(0)
 
 except Exception as e:
