@@ -97,6 +97,7 @@
                     } if(data.status > 1){
                         live_recorder.status_elem.style = "background: blue";
                     }
+                    $show_info.querySelector("#current-filename").innerHTML = data.filename || "–";
                 },
 
                 init: function() {
@@ -170,8 +171,9 @@
                 <h2 class="module-label label">Live Stream</h2>
                 <p class="status module-row">IDLE</p>
                 <dl class="status-field show-info module-row">
-                    <dt>Name</dt><dd id="current-show-name">No Show</dd>
-                    <dt>End</dt><dd id="current-show-end">–</dd>
+                    <dt>Show</dt><dd id="current-show-name">No Show</dd>
+                    <dt>Scheduled Ending</dt><dd id="current-show-end">–</dd>
+                    <dt>Filename</dt><dd id="current-filename">–</dd>
                 </dl>
             </section>
             <section id="master-source" class="box">
