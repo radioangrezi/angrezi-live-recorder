@@ -53,6 +53,8 @@ parser.add_argument(
 parser.add_argument(
     '--debug', help='Output DEBUG log.', action='store_true')
 parser.add_argument(
+    '--airtime-conf', type=str, help='Airtime config file to read. Usually: /etc/airtime/airtime.conf')
+parser.add_argument(
     'filename', nargs='?', metavar='FILENAME', help='audio file to store recording to')
 args = parser.parse_args()
 
@@ -85,7 +87,7 @@ recording_showslug_recv , recording_showslug_send = multiprocessing.Pipe(duplex=
 
 # WEB API in a seperate process
 
-from app import flaskThread
+from app import flaskThread, connect_to_airtime_api
 shared = {}
 shared['interrupt'] = interrupt
 shared['recording_start_timestamp'] = recording_start_timestamp
@@ -100,6 +102,7 @@ api_server = None
 def start_api_server(port=5000):
     global api_server
     if __name__ == "__main__":
+        connect_to_airtime_api(args.airtime_conf)
         api_server = multiprocessing.Process(target=flaskThread, kwargs={'shared':shared,'port':port,'debug':args.debug})
         api_server.start()
 

@@ -14,6 +14,7 @@
 # TODO: less requests?! websocket? or scheduled request similar to player frontend?
 # TODO: State conditions: Only record if connected -> No. It is nice to be able to record without connection. (It just needs better representation in the frontend.)
 # TODO: dont use flask in production!
+# UI: Trigger / Reminder to cut, when show end is close!
 
 import threading
 from flask import Flask
@@ -22,15 +23,13 @@ from flask import request
 from flask_cors import CORS
 # from flask_socketio import SocketIO
 
+# uses api_client.py (from source libretime/python_apps/api_clients/api_clients/api_client.py)
 from api_client import AirtimeApiClient
 
-# AIRTIME_CONFIG = '/etc/airtime/airtime.conf'
-AIRTIME_CONFIG = 'airtime.conf'
+airtime_api = None
 
 app = Flask(__name__)
 cors = CORS(app, resources={r"/*": {"origins": "*"}})
-app.config['SECRET_KEY'] = 'YQbv2CkMndeRe5dE'
-# socketio = SocketIO(app)
 
 import logging
 log = logging.getLogger('werkzeug')
@@ -61,14 +60,6 @@ def slugify(value):
 
 from flask import Response
 import json
-
-## uses api_client.py (from source libretime/python_apps/api_clients/api_clients/api_client.py)
-
-airtime_api = AirtimeApiClient(config_path=AIRTIME_CONFIG)
-
-if not airtime_api.is_server_compatible():
-    raise Exception("Server is not compatible with API.")
-    quit()
 
 #@app.route("/airtime/live-info-v2/")
 
@@ -161,15 +152,28 @@ def connect_start():
     # gives no response on success or failure :/
     return Response("Connection of Master Source (master_dj) requested.", status=200, mimetype='application/json')
 
-def flaskThread(port=None, shared=None, debug=False):
+def connect_to_airtime_api(airtime_config='airtime.conf'):
+    global airtime_api
+    airtime_api = AirtimeApiClient(config_path=airtime_config)
+    if not airtime_api.is_server_compatible():
+        raise Exception("Server is not compatible with API.")
+        quit()
+
+def flaskThread(port=None, shared=None, airtime_config=None, debug=False):
     global shared_with_recording_process, STATES
+
+    # shared beween processes
+    # TODO: simplyfy and clean up
     shared_with_recording_process = shared
     STATES = shared_with_recording_process['STATES']
-    get_show_name_and_send_to_pipe()
+    # fill filename initally
+    #get_show_name_and_send_to_pipe()
+
     try:
         port = port or args.port
     except NameError:
         port = None # default port 5000
+
     logging.info("Starting Webserver at %i" % port)
     app.run(port=port, host='0.0.0.0', debug=debug)
 
