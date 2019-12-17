@@ -3,17 +3,17 @@
 # RADIO ANGREZI CONTROLLER
 # 2019-06-02, ja
 
-# TODO: Filename generation and display
-# TODO: State conditions: Only record if connected
-# TODO: Stop recording when disconectin etc.
 # TODO: enhance frontend
-# TODO: README + minimal docs
-# start with name already, or start idle
-# logik und states vereinfachen: wenn conneted, dann record, sonst nix. zack feddisch.
+# TODO: loggin to propper logfile
+# TODO: add _part-XX if show longer than max. file length
+# ERROR: segmentation fault 11. 
+# ERROR: input overflow
 
 # TODO: v2 cleanup api
 # TODO: v2 reimplement frontend with react / backbone
 # TODO: less requests?! websocket? or scheduled request similar to player frontend?
+# TODO: State conditions: Only record if connected -> No. It is nice to be able to record without connection. (It just needs better representation in the frontend.)
+# TODO: dont use flask in production!
 
 import threading
 from flask import Flask
@@ -23,11 +23,6 @@ from flask_cors import CORS
 # from flask_socketio import SocketIO
 
 from api_client import AirtimeApiClient
-
-AIRTIME_HOST = 'studio.radioangrezi.de' #'localhost'
-AIRTIME_PORT = 80
-AIRTIME_PROTOCOL = 'http'
-AIRTIME_API_KEY = 'XLFR6DU8F456S3J7UTF7'
 
 # AIRTIME_CONFIG = '/etc/airtime/airtime.conf'
 AIRTIME_CONFIG = 'airtime.conf'
@@ -96,7 +91,7 @@ def get_bootstrap_info():
 # ACTIONS: not used in production
 #########
 
-@app.route("/disconect-master/")
+@app.route("/disconnect-master/")
 def disconect_master():
     response = airtime_api.notify_source_status('master_dj', 'false')
     return Response(json.dumps(response), status=200, mimetype='application/json')
@@ -123,26 +118,32 @@ def get_status_summary():
 # RECORDER
 #########
 
+current_filename = None
+
 def get_recorder_status():
+    global current_filename
     from datetime import datetime
     recording_state = shared_with_recording_process['recording_state'].value
     recording_start_datetime = datetime.fromtimestamp(shared_with_recording_process['recording_start_timestamp'].value)
     label = STATES(recording_state).name
     if STATES(recording_state) is STATES.RECORDING:
         label = "%s: %s" % (STATES.RECORDING.name, str(datetime.now() - recording_start_datetime).split('.')[0])
-    return { 'status': recording_state, 'text': label}
+    if shared_with_recording_process['recording_filename_recv'].poll():
+            current_filename = shared_with_recording_process['recording_filename_recv'].recv()
+    return { 'status': recording_state, 'text': label, 'filename': current_filename}
 
 def get_show_name_and_send_to_pipe():
     live_info = airtime_api.get_live_info()
     if live_info and live_info['currentShow'] and live_info['currentShow'][0] and live_info['currentShow'][0]['name']:
         name = slugify(live_info['currentShow'][0]['name'])
-        shared_with_recording_process['recording_filename_send'].send(name)
+        shared_with_recording_process['recording_showslug_send'].send(name)
 
 @app.route("/recording-request-cut/")
 def cut():
     get_show_name_and_send_to_pipe()
     shared_with_recording_process['interrupt'].set()
-    return "Cut requested."
+    shared_with_recording_process['recording_on_off'].value = True
+    return Response("New file requested.", status=200, mimetype='application/json')
 
 @app.route("/recording-disconnect-stop/")
 def disconnect_stop():
@@ -160,7 +161,7 @@ def connect_start():
     # gives no response on success or failure :/
     return Response("Connection of Master Source (master_dj) requested.", status=200, mimetype='application/json')
 
-def flaskThread(port=None, shared=None):
+def flaskThread(port=None, shared=None, debug=False):
     global shared_with_recording_process, STATES
     shared_with_recording_process = shared
     STATES = shared_with_recording_process['STATES']
@@ -170,7 +171,7 @@ def flaskThread(port=None, shared=None):
     except NameError:
         port = None # default port 5000
     logging.info("Starting Webserver at %i" % port)
-    app.run(port=port, host='0.0.0.0')
+    app.run(port=port, host='0.0.0.0', debug=debug)
 
 if __name__ == "__main__":
     threading.Thread(target=flaskThread).start()
