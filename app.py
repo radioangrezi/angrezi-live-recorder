@@ -16,6 +16,8 @@
 # TODO: dont use flask in production!
 # UI: Trigger / Reminder to cut, when show end is close!
 # TODO: flexible base url (also in index.html)
+# TODO: deploy script for production (incl. pip update)
+# TODO: signal ERROR if (API) server is down.
 
 import threading
 from flask import Flask
