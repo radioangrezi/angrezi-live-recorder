@@ -1,3 +1,6 @@
+@import "fonts/terminal-grotesque/stylesheet.css";
+@import "fonts/VG5000/font.css";
+
 body, html {
 	background: #000;
 	color: rgb(255,255,0);
@@ -9,7 +12,7 @@ body {
 
 body, h1, h2, h3, h4, h5, h6, p, span, button, input {
 	font-size: 12px;
-	font-family: "Terminal Grotesque", Courier, monospace;
+	font-family: "terminal_grotesque", Courier, monospace;
 	letter-spacing: 0.1em;
 	-webkit-font-smoothing: antialiased;
 	font-weight: normal;
