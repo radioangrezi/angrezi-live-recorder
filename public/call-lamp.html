@@ -1,0 +1,20 @@
+<html>
+  <head>
+  </head>
+  <body>
+    <video id="remoteVideo"></video>
+    <video id="localVideo" muted="muted"></video>
+
+    <script src="sip-0.13.1.min.js"></script>
+    <script>
+    	var userAgent = new SIP.UA({
+		       uri: 'studio@voip.radioangrezi.de',
+		       authorizationUser: 'studio',
+		       password: 'onair'
+		});
+    	userAgent.on('invite', function(session) {
+		  console.log(session)
+		});
+    </script>
+  </body>
+</html>
