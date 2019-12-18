@@ -15,6 +15,7 @@
 # TODO: State conditions: Only record if connected -> No. It is nice to be able to record without connection. (It just needs better representation in the frontend.)
 # TODO: dont use flask in production!
 # UI: Trigger / Reminder to cut, when show end is close!
+# TODO: flexible base url (also in index.html)
 
 import threading
 from flask import Flask
