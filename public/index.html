@@ -5,18 +5,115 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
         <meta name="description" content="Angrezi Controller">
         <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
-        <title>Angrezi Controller</title>
+        <title>Radio Angrezi Controller</title>
         <link href="normalize.css" rel="stylesheet"/>
         <link href="controller.css" rel="stylesheet"/>
+
         <script type="text/javascript">
 
         window.onload = function () {
+
+            window.API_HOST = 'http://localhost:5000' // no tailing slash /
+
+            window.$stream_status = document.querySelector("#icecast-stream p.status")
+            window.$show_info = document.querySelector("#icecast-stream .show-info")
+            window.$master_source_status = document.querySelector("#master-source p.status")
+            window.$btn_start_stop = document.querySelector("#btn-start-stop")
+
+            window.stream_status = null
+            window.master_source_status = null
+
+            window.status_update = {
+
+                update_status: function(){
+                    fetch(window.API_HOST + '/status-summary/')
+                    .then((res) => {
+                        return res.json().then(function (data) {
+
+                            // on air light
+                            window.stream_status = data.on_air_light && data.on_air_light.on_air_light == true
+                            window.status_update.ui_stream_status(window.stream_status)
+                            
+                            // show info
+                            current_show_info = data.live_info && data.live_info['currentShow'] && data.live_info['currentShow'][0]
+                            window.status_update.ui_show_info(Boolean(current_show_info), current_show_info)
+
+                            // master source status
+                            window.master_source_status = data.live_info && data.live_info['source_enabled'] && data.live_info['source_enabled'] == "Master"
+                            window.status_update.ui_master_source_status(window.master_source_status)
+
+                            // recorder
+                            window.status_update.ui_recorder_status(data.recorder)
+                            
+                        });
+                    })
+                    .catch((error) => live_recorder.log(error))
+                },
+
+                ui_stream_status: function(status){
+                    if(status){
+                        $stream_status.innerHTML = "ON AIR"
+                        $stream_status.style = "background: red;";
+                    }else {
+                        $stream_status.innerHTML = "OFF AIR"
+                        $stream_status.style = "background: gray";
+                    }
+                },
+
+                ui_show_info: function(status, data){
+                    if(status){
+                        $show_info.querySelector("#current-show-name").innerHTML = data.name;
+                        $show_info.querySelector("#current-show-end").innerHTML = data.ends;
+                    }else {
+                        $show_info.querySelector("#current-show-name").innerHTML = "Currently no show";
+                        $show_info.querySelector("#current-show-end").innerHTML = "–";
+                    }
+                },
+
+                ui_master_source_status: function(status){
+                    if(window.master_source_status){
+                        $master_source_status.innerHTML = "CONNECTED"
+                        $master_source_status.style = "background: #0069ed;";
+
+                        $btn_start_stop.querySelector("p").innerHTML = "Disconnect + Stop Recording"
+                        $btn_start_stop.style = "background: red;"
+                    }else {
+                        $master_source_status.innerHTML = "DISCONNECTED"
+                        $master_source_status.style = "background: grey";
+
+                        $btn_start_stop.querySelector("p").innerHTML = "Connect + Start Recording"
+                        $btn_start_stop.style = "background: #0069ed;"
+                    }
+                },
+
+                ui_recorder_status: function(data){
+                    live_recorder.status_elem.innerHTML = data.text
+                    if(data.status < 0){
+                        live_recorder.status_elem.style = "background: yellow; color: black;";
+                    }else if(data.status == 0){
+                        live_recorder.status_elem.style = "background: gray";
+                    }else if(data.status == 1){
+                        live_recorder.status_elem.style = "background: red";
+                    } if(data.status > 1){
+                        live_recorder.status_elem.style = "background: blue";
+                    }
+                    $show_info.querySelector("#current-filename").innerHTML = data.filename || "–";
+                },
+
+                init: function() {
+                    var interval = window.setInterval(this.update_status, 1000);
+                    return this;
+                }
+
+            }.init()
 
             window.live_recorder = {
 
                 status_elem: document.querySelector("#live-recorder p.status"),
                 button_elem: document.querySelector("#live-recorder .button"),
-                output_elem: document.querySelector("#live-recorder textarea.output"),
+                output_elem: document.querySelector("#debug-out"),
+
+                //master_source_status_elem: status_elem: document.querySelector("#master-source p.status"),
 
                 log: function(text){
                     console.log(text)
@@ -26,30 +123,10 @@
                     // scroll to bottom
                     live_recorder.output_elem.scrollTop = live_recorder.output_elem.scrollHeight;
                 },
-
-                update_status: function(){
-                    var module_parent = this
-                    fetch('/proxy/live-recorder/')
-                    .then((res) => {
-                        return res.json().then(function (data) {
-                            live_recorder.status_elem.innerHTML = data.text
-                            if(data.status < 0){
-                                live_recorder.status_elem.style = "background: yellow; color: black;";
-                            }else if(data.status == 0){
-                                live_recorder.status_elem.style = "background: gray";
-                            }else if(data.status == 1){
-                                live_recorder.status_elem.style = "background: red";
-                            } if(data.status > 1){
-                                live_recorder.status_elem.style = "background: blue";
-                            }
-                        });
-                    })
-                    .catch((error) => live_recorder.log(error))
-                },
-
+                
                 reset_recordning: function(){
 
-                    fetch('/proxy/live-recorder/reset')
+                    fetch(window.API_HOST + '/recording-request-cut/')
                     .then((res) => {
                         return res.text().then(function (text) {
                             live_recorder.status_elem.style = "background: #66FF00";
@@ -60,32 +137,64 @@
 
                 },
 
+                toggle_start_stop: function(){
+                    if(window.master_source_status){
+                        api_method = '/recording-disconnect-stop/'
+                    }else {
+                        api_method = '/recording-connect-start/'
+                    }
+                    fetch(window.API_HOST + api_method)
+                    .then((res) => {
+                        return res.text().then(function (text) {
+                            live_recorder.status_elem.style = "background: yellow";
+                            live_recorder.log(text)
+                        });
+                    })
+                    .catch((error) => live_recorder.log(error))
+
+                },
+
                 init: function() {
-                    var recorder_interval = window.setInterval(this.update_status, 1000);
+                    //var recorder_interval = window.setInterval(this.update_status, 1000);
                     return this;
                 }
 
-            }.init();
+            }//.init();
 
         };
 
         </script>
     </head>
     <body>
-        <header>
-            <h1>Radio Angrezi <span>Controller</span></h1>
-        </header>
         <main>
-            <section id="live-recorder" class="box">
-                <h2 class="module-label label">Live Recorder</h2>
+            <section id="icecast-stream" class="box">
+                <h2 class="module-label label">Live Stream</h2>
                 <p class="status module-row">IDLE</p>
-                <button class="button module-row doubleclick" ondblclick="live_recorder.reset_recordning()">
-                    <small>( double click )</small>
-                    <p>Start New Recording</p>
-                    <small class="warning">Attention! Can't be undone.</small>
+                <dl class="status-field show-info module-row">
+                    <dt>Show</dt><dd id="current-show-name">No Show</dd>
+                    <dt>Scheduled Ending</dt><dd id="current-show-end">–</dd>
+                    <dt>Filename</dt><dd id="current-filename">–</dd>
+                </dl>
+            </section>
+            <section id="master-source" class="box">
+                <h2 class="module-label label">Studio Speicher XI (Master Source)</h2>
+                <p class="status module-row">IDLE</p>
+            </section>
+            <section id="live-recorder" class="box">
+                <h2 class="module-label label">Live Recorder (Local / Studio Speicher XI)</h2>
+                <p class="status module-row">IDLE</p>
+                <button class="btn-blue button module-row doubleclick" id="btn-cut" ondblclick="live_recorder.reset_recordning()">
+                    <p>Next Show / Cut Recording</p>
+                    <small class="warning">double click</small>
                 </button>
-                <h3 class="label">Output</h3>
-                <textarea readonly="readonly" class="output textarea module-row"></textarea>
+                <button class="btn-red button module-row doubleclick" id="btn-start-stop" ondblclick="live_recorder.toggle_start_stop()">
+                    <p>Disconnect + Stop Recording</p>
+                    <small class="warning">double click</small>
+                </button>
+            </section>
+            <section id="debug-log-out" class="box">
+                <h2 class="module-label label">Log Out</h2>
+                <textarea readonly="readonly" id="debug-out" class="output textarea module-row"></textarea>
             </section>
         </main>
     </body>

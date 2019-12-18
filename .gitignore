@@ -112,3 +112,12 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# audio files
+*.wav
+*.mp3
+
+local-secret
+
+#PyCharm stuff
+.idea
