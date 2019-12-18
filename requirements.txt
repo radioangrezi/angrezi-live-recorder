@@ -12,3 +12,6 @@ PySoundFile==0.9.0
 six==1.13.0
 sounddevice==0.3.13
 Werkzeug==0.15.4
+enum34==1.1.6
+requests==2.22.0
+configobj==5.0.6
