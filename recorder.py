@@ -166,7 +166,7 @@ try:
                 # recordning loop: running once per frame (or until q is empty)
                 while True: 
                     # enforce a hard limit on the file size (wav max: ~ 4 GB)
-                    data_size = file.frames * frame_size
+                    data_size = len(file) * frame_size
                     # log.debug("Current data size: %i" % data_size)
                     if interrupt.is_set() and data_size < 10:
                         # two cuts without any data in between.
