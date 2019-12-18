@@ -10,7 +10,7 @@ State: **Beta** (Check `app.py` for a to do list.)
 
 ## Requirements
 
-- Python 2.7
+- Python 2.7 (3.X is not supported by `api_client.py)
 - pip and virtualenv (recommended)
 - python-sounddevice supported soundcard as input device
 - install requirements via `pip install -r requirements.txt`
