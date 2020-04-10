@@ -205,7 +205,7 @@ try:
         # alternative: https://github.com/jpaille/streamripper
         ripper = subprocess.Popen([
             'streamripper',
-            'https://st02.sslstream.dlf.de/dlf/02/128/mp3/stream.mp3',
+            args.stream,
             #'-d',
             #'./streams',
             #'-l',
