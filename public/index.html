@@ -14,14 +14,22 @@
         window.onload = function () {
 
             window.API_HOST = '/proxy/live-recorder' // no tailing slash /
+            window.API_HOST_STREAM = '/proxy/stream-recorder' // no tailing slash /
+            if (window.location.protocol == "file:") {
+                // local dev
+                window.API_HOST = 'http://localhost:5000'
+                window.API_HOST_STREAM = 'http://localhost:5000'
+            }
 
             window.$stream_status = document.querySelector("#icecast-stream p.status")
             window.$show_info = document.querySelector("#icecast-stream .show-info")
             window.$master_source_status = document.querySelector("#master-source p.status")
-            window.$btn_start_stop = document.querySelector("#btn-start-stop")
+            window.$btn_start_stop = document.querySelector("#live-recorder #btn-start-stop")
+            window.$stream_btn_start_stop = document.querySelector("#stream-recorder #btn-start-stop")
 
             window.stream_status = null
             window.master_source_status = null
+            window.stream_recorder_status = null
 
             window.status_update = {
 
@@ -29,7 +37,6 @@
                     fetch(window.API_HOST + '/status-summary/')
                     .then((res) => {
                         return res.json().then(function (data) {
-
                             // on air light
                             window.stream_status = data.on_air_light && data.on_air_light.on_air_light == true
                             window.status_update.ui_stream_status(window.stream_status)
@@ -43,11 +50,21 @@
                             window.status_update.ui_master_source_status(window.master_source_status)
 
                             // recorder
-                            window.status_update.ui_recorder_status(data.recorder)
+                            window.status_update.ui_live_recorder_status(data.recorder)
                             
                         });
                     })
-                    .catch((error) => live_recorder.log(error))
+                    .catch((error) => live_recorder.log("Live Rec: " + error))
+
+                    fetch(window.API_HOST_STREAM + '/status-summary/')
+                    .then((res) => {
+                        return res.json().then(function (data) {
+                            window.stream_recorder_status = data.recorder.status
+                            window.status_update.ui_stream_recorder_status(data.recorder)
+                            
+                        });
+                    })
+                    .catch((error) => live_recorder.log("Stream Rec: " + error))
                 },
 
                 ui_stream_status: function(status){
@@ -86,7 +103,7 @@
                     }
                 },
 
-                ui_recorder_status: function(data){
+                ui_live_recorder_status: function(data){
                     live_recorder.status_elem.innerHTML = data.text
                     if(data.status < 0){
                         live_recorder.status_elem.style = "background: yellow; color: black;";
@@ -96,6 +113,27 @@
                         live_recorder.status_elem.style = "background: red";
                     } if(data.status > 1){
                         live_recorder.status_elem.style = "background: blue";
+                    }
+                    $show_info.querySelector("#current-filename").innerHTML = data.filename || "–";
+                },
+
+                ui_stream_recorder_status: function(data){
+                    stream_recorder.status_elem.innerHTML = data.text
+                    if(data.status < 0){
+                        stream_recorder.status_elem.style = "background: yellow; color: black;";
+                    }else if(data.status == 0){
+                        stream_recorder.status_elem.style = "background: gray";
+                    }else if(data.status == 1){
+                        stream_recorder.status_elem.style = "background: red";
+                    } if(data.status > 1){
+                        stream_recorder.status_elem.style = "background: blue";
+                    }
+                    if(window.stream_recorder_status){
+                        $stream_btn_start_stop.querySelector("p").innerHTML = "Stop Recording"
+                        $stream_btn_start_stop.style = "background: red;"
+                    }else {
+                        $stream_btn_start_stop.querySelector("p").innerHTML = "Start Recording"
+                        $stream_btn_start_stop.style = "background: #0069ed;"
                     }
                     $show_info.querySelector("#current-filename").innerHTML = data.filename || "–";
                 },
@@ -161,6 +199,60 @@
 
             }//.init();
 
+            window.stream_recorder = {
+
+                status_elem: document.querySelector("#stream-recorder p.status"),
+                button_elem: document.querySelector("#stream-recorder .button"),
+                output_elem: document.querySelector("#debug-out"),
+
+                //master_source_status_elem: status_elem: document.querySelector("#master-source p.status"),
+
+                log: function(text){
+                    console.log(text)
+                    var d = new Date()
+                    var n = d.toLocaleTimeString()
+                    stream_recorder.output_elem.value += n + ": " + text + "\n"
+                    // scroll to bottom
+                    stream_recorder.output_elem.scrollTop = stream_recorder.output_elem.scrollHeight;
+                },
+                
+                reset_recordning: function(){
+
+                    fetch(window.API_HOST_STREAM + '/recording-request-cut/')
+                    .then((res) => {
+                        return res.text().then(function (text) {
+                            live_recorder.status_elem.style = "background: #66FF00";
+                            live_recorder.log(text)
+                        });
+                    })
+                    .catch((error) => stream_recorder.log(error))
+
+                },
+
+                toggle_start_stop: function(){
+                    if(window.stream_recorder_status == 1){
+                        api_method = '/recording-stop/'
+                    }else {
+                        api_method = '/recording-start/'
+                    }
+                    fetch(window.API_HOST_STREAM + api_method)
+                    .then((res) => {
+                        return res.text().then(function (text) {
+                            stream_recorder.status_elem.style = "background: yellow";
+                            stream_recorder.log(text)
+                        });
+                    })
+                    .catch((error) => stream_recorder.log(error))
+
+                },
+
+                init: function() {
+                    //var recorder_interval = window.setInterval(this.update_status, 1000);
+                    return this;
+                }
+
+            }
+
         };
 
         </script>
@@ -182,6 +274,14 @@
             </section>
             <section id="live-recorder" class="box">
                 <h2 class="module-label label">Live Recorder (Local / Studio Speicher XI)</h2>
+<!--                 <div class="module-row">
+                    <fieldset>
+                        <input type="radio" id="xi" name="source" value="studio-xi"/>
+                        <label for="xi"> Studio / Speicher XI</label> 
+                        <input type="radio" id="st" name="source" value="stream"/>
+                        <label for="st"> Stream</label>
+                      </fieldset>
+                </div> -->
                 <p class="status module-row">IDLE</p>
                 <button class="btn-blue button module-row doubleclick" id="btn-cut" ondblclick="live_recorder.reset_recordning()">
                     <p>Next Show / Cut Recording</p>
@@ -189,6 +289,19 @@
                 </button>
                 <button class="btn-red button module-row doubleclick" id="btn-start-stop" ondblclick="live_recorder.toggle_start_stop()">
                     <p>Disconnect + Stop Recording</p>
+                    <small class="warning">double click</small>
+                </button>
+            </section>
+
+            <section id="stream-recorder" class="box">
+                <h2 class="module-label label">Stream Recorder</h2>
+                <p class="status module-row">IDLE</p>
+                <button class="btn-blue button module-row doubleclick" id="btn-cut" ondblclick="stream_recorder.reset_recordning()">
+                    <p>Next Show / Cut Recording</p>
+                    <small class="warning">double click</small>
+                </button>
+                <button class="btn-red button module-row doubleclick" id="btn-start-stop" ondblclick="stream_recorder.toggle_start_stop()">
+                    <p>Stop Recording</p>
                     <small class="warning">double click</small>
                 </button>
             </section>

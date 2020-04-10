@@ -25,9 +25,13 @@ State: **Beta** (Check `app.py` for a to do list.)
 
 Linux (Production): `python /var/angrezi/live-recorder/recorder.py -d stream_in_16 -t PCM_16 "%Y/%m/%d/studio-live-%Y-%m-%d-%H-%M-%S.wav"`
 Mac (Development): `python recorder.py -d 0 rec-test-%Y-%m-%d-%H-%M-%S.wav`
-Webserver only (Development): `flask run`
+Webserver only (Development): `flask run` (API usually on port 500, open /public/index.html)
 
 ## Architecture
+
+Update: Recording from Stream added. Currently in Testing.
+
+`python recorder.py --port 5000 --airtime-conf local-secret/airtime.conf --stream https://st02.sslstream.dlf.de/dlf/02/128/mp3/stream.mp3 rec-test-%Y-%m-%d-%H-%M-%S.mp3`
 
 ### `recorder.py`
 

@@ -155,6 +155,19 @@ def connect_start():
     # gives no response on success or failure :/
     return Response("Connection of Master Source (master_dj) requested.", status=200, mimetype='application/json')
 
+@app.route("/recording-stop/")
+def rec_stop():
+    shared_with_recording_process['recording_on_off'].value = False
+    shared_with_recording_process['interrupt'].set()
+    return Response("Recording stopped.", status=200, mimetype='application/json')
+
+@app.route("/recording-start/")
+def rec_start():
+    get_show_name_and_send_to_pipe()
+    shared_with_recording_process['recording_on_off'].value = True
+    return Response("Recording started.", status=200, mimetype='application/json')
+
+
 def connect_to_airtime_api(airtime_config='airtime.conf'):
     global airtime_api
     airtime_api = AirtimeApiClient(config_path=airtime_config)

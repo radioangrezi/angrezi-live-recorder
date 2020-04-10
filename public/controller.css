@@ -19,11 +19,15 @@ body, h1, h2, h3, h4, h5, h6, p, span, button, input {
 	margin: 0;
 }
 
+fieldset {
+	border: 0;
+}
+
 .label {
 	text-transform: uppercase;
 	font-size: 10px;
 	margin: 0.3em 0;
-	opacity: 0.5;
+	opacity: 1;
 }
 
 small {

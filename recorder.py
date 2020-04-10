@@ -21,6 +21,7 @@ from flask_cors import CORS
 import multiprocessing
 import logging
 import numpy
+import subprocess 
 
 # python 2/3 compatible
 try: 
@@ -41,7 +42,7 @@ parser.add_argument(
     help='show list of audio devices and exit')
 parser.add_argument(
     '-d', '--device', type=int_or_str,
-    help='input device (numeric ID or substring)')
+    help='input device (numeric ID or substring). Cant be used with --stream.')
 parser.add_argument(
     '-r', '--samplerate', type=int, default=4400, help='sampling rate')
 parser.add_argument(
@@ -56,6 +57,9 @@ parser.add_argument(
     '--airtime-conf', type=str, help='Airtime config file to read. Usually: /etc/airtime/airtime.conf')
 parser.add_argument(
     'filename', nargs='?', metavar='FILENAME', help='audio file to store recording to')
+parser.add_argument(
+    '-s', '--stream', type=str,
+    help='Stream url to record with streamripper. Cant be used with --device.')
 args = parser.parse_args()
 
 # recording states
@@ -99,6 +103,10 @@ shared['STATES'] = STATES
 
 api_server = None
 
+DEVICE = 'device'
+STREAM = 'stream'
+SOURCE = None
+
 def start_api_server(port=5000):
     global api_server
     if __name__ == "__main__":
@@ -125,12 +133,24 @@ try:
         parser.exit(0)
 
     if args.filename is None:
-        print("error: no FILENAME argument provided. Use -h for help.")
+        print("Error: No filename argument provided. Use -h for help.")
         parser.exit(0)
+
+    if args.stream is not None and args.device is not None:
+        print("Error: Audio device and stream url rguments given! Use --stream to record from stream url OR --device to record from local device. Use -h for help.")
+        parser.exit(0)
+
+    if args.stream is not None:
+        SOURCE = STREAM
+    else:
+        SOURCE = DEVICE
 
     # only start api server if port argument is set. just record if not.
     if args.port:
         start_api_server(port=args.port)
+    else:
+        #autostart recording
+        recording_on_off.value = True
 
     if args.samplerate is None:
         device_info = sd.query_devices(args.device, 'input')
@@ -138,10 +158,6 @@ try:
         args.samplerate = int(device_info['default_samplerate'])
 
     q = queue.Queue()
-
-    print('#' * 80)
-    print('press Ctrl+C to stop the recording')
-    print('#' * 80)
 
     import copy
 
@@ -184,6 +200,40 @@ try:
                         set_recording_state(STATES.RECORDING)
                         file.write(q.get())
 
+    def record_stream_to_file(filename):
+        global recording_state, recording_start_timestamp
+        # alternative: https://github.com/jpaille/streamripper
+        ripper = subprocess.Popen([
+            'streamripper',
+            'https://st02.sslstream.dlf.de/dlf/02/128/mp3/stream.mp3',
+            #'-d',
+            #'./streams',
+            #'-l',
+            #'10800',
+            '-A',
+            '-a',
+            filename
+        ])
+        set_recording_timestamp(time.mktime(datetime.now().timetuple()))
+        # enforce a hard limit on the file size (wav max: ~ 4 GB). THIS IS MP3, now!
+        while True: 
+            if interrupt.is_set():
+                interrupt.clear()
+                log.info("Recorder: making cut")
+                log.info('Recorder: Finished file ' + repr(filename))
+                ripper.terminate()
+                try:
+                    os.system("rm *.cue")
+                except:
+                    pass
+                set_recording_state(STATES.IDLE)
+                return -1 # stop / end of recording (need new filename)
+            else:
+                set_recording_state(STATES.RECORDING)
+                continue
+        print('cleanup')
+        ripper.terminate()
+
 
     def generate_filename_and_directory():
         # add date and time to filename
@@ -209,19 +259,34 @@ try:
 
     i = 0
     # file loop: runs once per recordning, waiting (ideling) unlimitedly until a new recoring shall start
+    print('#' * 80)
+    print('press Ctrl+C to stop the recording')
+    print('#' * 80)
     while True:
         # do not run if (requested) state is not off (False)
         if recording_on_off.value:
-            filename = generate_filename_and_directory()
-            if record_to_file(filename) != -1:
-                break
-            i = i + 1
+            if SOURCE is STREAM:
+                filename = generate_filename_and_directory()
+                print('recording from stream...')
+                if record_stream_to_file(filename) != -1:
+                    break
+                i = i + 1
+            else:
+                filename = generate_filename_and_directory()
+                print('recording from device...')
+                if record_to_file(filename) != -1:
+                    break
+                i = i + 1
 
 except KeyboardInterrupt:
     if api_server:
         api_server.terminate()
         api_server.join()
 
+    try:
+        os.system("rm *.cue")
+    except:
+        pass
     set_recording_state(STATES.ERROR)
     parser.exit(0)
 
