@@ -135,7 +135,7 @@
                         $stream_btn_start_stop.querySelector("p").innerHTML = "Start Recording"
                         $stream_btn_start_stop.style = "background: #0069ed;"
                     }
-                    $show_info.querySelector("#current-filename").innerHTML = data.filename || "–";
+                    $show_info.querySelector("#current-filename-stream").innerHTML = data.filename || "–";
                 },
 
                 init: function() {
@@ -265,7 +265,8 @@
                 <dl class="status-field show-info module-row">
                     <dt>Show</dt><dd id="current-show-name">No Show</dd>
                     <dt>Scheduled Ending</dt><dd id="current-show-end">–</dd>
-                    <dt>Filename</dt><dd id="current-filename">–</dd>
+                    <dt>Filename (Studio)</dt><dd id="current-filename">–</dd>
+                    <dt>Filename (Stream)</dt><dd id="current-filename-stream">–</dd>
                 </dl>
             </section>
             <section id="master-source" class="box">
