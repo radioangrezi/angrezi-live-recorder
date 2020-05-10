@@ -184,8 +184,7 @@ try:
         start_api_server(port=args.port)
     else:
         # autostart recording if no webserver
-        recording_on_off = False
-        # FIXME back to True
+        recording_on_off = True
 
     if args.samplerate is None:
         device_info = sd.query_devices(args.device, 'input')
