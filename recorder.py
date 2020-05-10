@@ -71,16 +71,52 @@ class STATES(Enum):
     RECORDING = 1
     STOPPED = 2
 
+# signal to start and stop recording
+
+class SignalEvent(object):
+
+    value = False
+
+    def is_set(self):
+        return self.value
+
+    def set(self, value):
+        self.value = value
+
+    def clear(self):
+        self.value = False
+
+interrupt = SignalEvent()
+recording_on_off = False
+
+def receive_signal_start(signum, stack):
+    global recording_on_off, interrupt
+    interrupt.set(False)
+    recording_on_off = True
+
+def receive_signal_stop(signum, stack):
+    global recording_on_off, interrupt
+    interrupt.set(True)
+    recording_on_off = False
+
+def receive_signal_cut(signum, stack):
+    global recording_on_off, interrupt
+    interrupt.set(True)
+    recording_on_off = True
+
+signal.signal(signal.SIGUSR1, receive_signal_start)
+signal.signal(signal.SIGUSR2, receive_signal_stop)
+signal.signal(signal.SIGALRM, receive_signal_cut)
+
 # these are shared between processes
 
-interrupt = multiprocessing.Event()
-
 recording_start_timestamp = multiprocessing.Value('d', 0)
+
 def set_recording_timestamp(timestamp):
     recording_start_timestamp.value = timestamp
 
 recording_state = multiprocessing.Value('i', 0)
-recording_on_off = multiprocessing.Value('i', 0)
+
 def set_recording_state(enum):
     recording_state.value = enum.value
 def get_recording_state_enum(state):
@@ -89,16 +125,14 @@ def get_recording_state_enum(state):
 recording_filename_recv , recording_filename_send = multiprocessing.Pipe(duplex=False)
 recording_showslug_recv , recording_showslug_send = multiprocessing.Pipe(duplex=False)
 
-# WEB API in a seperate process
+# WEB API in a separate process
 
 from app import flaskThread, connect_to_airtime_api
 shared = {}
-shared['interrupt'] = interrupt
 shared['recording_start_timestamp'] = recording_start_timestamp
 shared['recording_state'] = recording_state
 shared['recording_showslug_send'] = recording_showslug_send
 shared['recording_filename_recv'] = recording_filename_recv
-shared['recording_on_off'] = recording_on_off
 shared['STATES'] = STATES
 
 api_server = None
@@ -111,7 +145,7 @@ def start_api_server(port=5000):
     global api_server
     if __name__ == "__main__":
         connect_to_airtime_api(args.airtime_conf)
-        api_server = multiprocessing.Process(target=flaskThread, kwargs={'shared':shared,'port':port,'debug':args.debug})
+        api_server = multiprocessing.Process(target=flaskThread, kwargs={'shared':shared,'port':port,'debug':args.debug,'rec_pid':os.getpid()})
         api_server.start()
 
 # AUDIO RECORDER - based on https://python-sounddevice.readthedocs.io/en/0.3.12/examples.html#recording-with-arbitrary-duration
@@ -149,8 +183,9 @@ try:
     if args.port:
         start_api_server(port=args.port)
     else:
-        #autostart recording
-        recording_on_off.value = True
+        # autostart recording if no webserver
+        recording_on_off = False
+        # FIXME back to True
 
     if args.samplerate is None:
         device_info = sd.query_devices(args.device, 'input')
@@ -216,21 +251,19 @@ try:
         ])
         set_recording_timestamp(time.mktime(datetime.now().timetuple()))
         # enforce a hard limit on the file size (wav max: ~ 4 GB). THIS IS MP3, now!
-        while True: 
-            if interrupt.is_set():
-                interrupt.clear()
-                log.info("Recorder: making cut")
-                log.info('Recorder: Finished file ' + repr(filename))
-                ripper.terminate()
-                try:
-                    os.system("rm *.cue")
-                except:
-                    pass
-                set_recording_state(STATES.IDLE)
-                return -1 # stop / end of recording (need new filename)
-            else:
-                set_recording_state(STATES.RECORDING)
-                continue
+        set_recording_state(STATES.RECORDING)
+        time.sleep(600)
+        if interrupt.is_set():
+            interrupt.clear()
+            log.info("Recorder: making cut")
+            log.info('Recorder: Finished file ' + repr(filename))
+            ripper.terminate()
+            try:
+                os.system("rm *.cue")
+            except:
+                pass
+            set_recording_state(STATES.IDLE)
+            return -1 # stop / end of recording (need new filename)
         print('cleanup')
         ripper.terminate()
 
@@ -264,7 +297,7 @@ try:
     print('#' * 80)
     while True:
         # do not run if (requested) state is not off (False)
-        if recording_on_off.value:
+        if recording_on_off:
             if SOURCE is STREAM:
                 filename = generate_filename_and_directory()
                 print('recording from stream...')
@@ -277,6 +310,7 @@ try:
                 if record_to_file(filename) != -1:
                     break
                 i = i + 1
+        time.sleep(1)
 
 except KeyboardInterrupt:
     if api_server:

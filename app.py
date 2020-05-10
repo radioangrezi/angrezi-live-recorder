@@ -19,7 +19,7 @@
 # TODO: deploy script for production (incl. pip update) and service
 # TODO: signal ERROR if (API) server is down.
 
-import threading
+import threading, os, signal
 from flask import Flask
 from flask import jsonify
 from flask import request
@@ -41,6 +41,23 @@ log.setLevel(logging.WARNING)
 logging.basicConfig(level=logging.WARNING)
 
 shared_with_recording_process = None
+REC_PID = None
+
+def send_signal_start():
+    if REC_PID:
+        print("sending SIGUSR1 to %i" % REC_PID)
+        os.kill(REC_PID, signal.SIGUSR1)
+
+def send_signal_stop():
+    if REC_PID:
+        print("sending SIGUSR2 to %i" % REC_PID)
+        os.kill(REC_PID, signal.SIGUSR2)
+
+def send_signal_cut():
+    if REC_PID:
+        print("sending SIGALRM to %i" % REC_PID)
+        os.kill(REC_PID, signal.SIGALRM)
+
 
 #########
 # HELPERS
@@ -135,14 +152,12 @@ def get_show_name_and_send_to_pipe():
 @app.route("/recording-request-cut/")
 def cut():
     get_show_name_and_send_to_pipe()
-    shared_with_recording_process['interrupt'].set()
-    shared_with_recording_process['recording_on_off'].value = True
+    send_signal_cut()
     return Response("New file requested.", status=200, mimetype='application/json')
 
 @app.route("/recording-disconnect-stop/")
 def disconnect_stop():
-    shared_with_recording_process['recording_on_off'].value = False
-    shared_with_recording_process['interrupt'].set()
+    send_signal_stop()
     response = airtime_api.notify_source_status('master_dj', 'false')
     # gives no response on success or failure :/
     return Response("Disconnection of Master Source (master_dj) requested.", status=200, mimetype='application/json')
@@ -150,21 +165,20 @@ def disconnect_stop():
 @app.route("/recording-connect-start/")
 def connect_start():
     get_show_name_and_send_to_pipe()
-    shared_with_recording_process['recording_on_off'].value = True
+    send_signal_start()
     response = airtime_api.notify_source_status('master_dj', 'true')
     # gives no response on success or failure :/
     return Response("Connection of Master Source (master_dj) requested.", status=200, mimetype='application/json')
 
 @app.route("/recording-stop/")
 def rec_stop():
-    shared_with_recording_process['recording_on_off'].value = False
-    shared_with_recording_process['interrupt'].set()
+    send_signal_stop()
     return Response("Recording stopped.", status=200, mimetype='application/json')
 
 @app.route("/recording-start/")
 def rec_start():
     get_show_name_and_send_to_pipe()
-    shared_with_recording_process['recording_on_off'].value = True
+    send_signal_start()
     return Response("Recording started.", status=200, mimetype='application/json')
 
 
@@ -175,13 +189,14 @@ def connect_to_airtime_api(airtime_config='airtime.conf'):
         raise Exception("Server is not compatible with API.")
         quit()
 
-def flaskThread(port=None, shared=None, airtime_config=None, debug=False):
-    global shared_with_recording_process, STATES
+def flaskThread(port=None, shared=None, airtime_config=None, debug=False, rec_pid=None):
+    global shared_with_recording_process, STATES, REC_PID
 
     # shared beween processes
     # TODO: simplyfy and clean up
     shared_with_recording_process = shared
     STATES = shared_with_recording_process['STATES']
+    REC_PID = rec_pid
     # fill filename initally
     #get_show_name_and_send_to_pipe()
 

@@ -10,7 +10,7 @@ State: **Beta** (Check `app.py` for a to do list.)
 
 ## Requirements
 
-- Python 2.7 (3.X is not supported by `api_client.py)
+- Python 2.7 (3.X is not supported by `api_client.py`)
 - pip and virtualenv (recommended)
 - python-sounddevice supported soundcard as input device
 - install requirements via `pip install -r requirements.txt`
@@ -25,13 +25,14 @@ State: **Beta** (Check `app.py` for a to do list.)
 
 Linux (Production): `python /var/angrezi/live-recorder/recorder.py -d stream_in_16 -t PCM_16 "%Y/%m/%d/studio-live-%Y-%m-%d-%H-%M-%S.wav"`
 Mac (Development): `python recorder.py -d 0 rec-test-%Y-%m-%d-%H-%M-%S.wav`
-Webserver only (Development): `flask run` (API usually on port 500, open /public/index.html)
+Webserver only (Development): `flask run` (API usually on port 5000, open /public/index.html)
 
 ## Architecture
 
 Update: Recording from Stream added. Currently in Testing.
 
-`python recorder.py --port 5000 --airtime-conf local-secret/airtime.conf --stream https://st02.sslstream.dlf.de/dlf/02/128/mp3/stream.mp3 rec-test-%Y-%m-%d-%H-%M-%S.mp3`
+Dev --stream: `python recorder.py --port 5000 --airtime-conf local-secret/airtime.conf --stream https://st02.sslstream.dlf.de/dlf/02/128/mp3/stream.mp3 rec-test-%Y-%m-%d-%H-%M-%S.mp3`
+Dev -d `python recorder.py -d 0 --port 5000 --airtime-conf local-secret/airtime.conf rec-test-%Y-%m-%d-%H-%M-%S.wav`
 
 ### `recorder.py`
 
