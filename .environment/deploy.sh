@@ -13,7 +13,7 @@ VIRTUALENV= $DEPLOY_DEST/../venv
 sudo systemctl stop $SERVICE_NAME
 
 # make virtualenv
-if [! -d "$DIR" ]; then
+if [ ! -d "$VIRTUALENV" ]; then
     virtualenv -p python2 $VIRTUALENV
 fi
 
@@ -28,7 +28,7 @@ sudo cp -r $DEPLOY_FROM/. $DEPLOY_DEST
 sudo chown -R $SERVICE_USER:$SERVICE_USER $DEPLOY_DEST
 
 # update virtualenv
-sudo -u $SERVICE_USER source $VIRTUALENV/bin/activate && pip install -r $DEPLOY_DEST/requirements.txt
+sudo -u $SERVICE_USER $VIRTUALENV/bin/pip install -r $DEPLOY_DEST/requirements.txt
 
 # restart service
 sudo systemctl restart $SERVICE_NAME
