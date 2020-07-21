@@ -14,3 +14,4 @@ Werkzeug==0.15.4
 enum34==1.1.6
 requests==2.22.0
 configobj==5.0.6
+future==0.18.2

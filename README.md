@@ -2,50 +2,19 @@
 
 Audio recorder build in Python to work together with [LibreTime](https://github.com/LibreTime/libretime) / [Airtime](https://www.airtime.pro/), for usage in radio studio (or similar).
 
-Records form a local sound device in with (almost) arbitrary duration.
-Files fill be cut when max. size for wav (of ~ 4 GB) is reached.
+Records a http radio stream (via streamripper) for a maximum duration of 24 hours.
 Allows to remotely trigger cuts via HTTP request. Comes with a very simple frontend.
-
-State: **Beta** (Check `app.py` for a to do list.)
 
 ## Requirements
 
 - Python 2.7 (3.X is not supported by `api_client.py)
 - pip and virtualenv (recommended)
-- python-sounddevice supported soundcard as input device
+- streamripper (binary, e.g. via `apt install streamripper`)
 - install requirements via `pip install -r requirements.txt`
 
 ## Usage
 
-`recorder.py --list-devices` to list available input devices.
-`recorder.py -d XX "%Y/%m/%d/studio-live-%Y-%m-%d-%H-%M-%S.wav"` to start recording without web server (does not autostart!)
-`recorder.py --port 5000 -d XX "%Y/%m/%d/studio-live-%Y-%m-%d-%H-%M-%S.wav"` to start recording with webserver.
-
-### Examples
-
-Linux (Production): `python /var/angrezi/live-recorder/recorder.py -d stream_in_16 -t PCM_16 "%Y/%m/%d/studio-live-%Y-%m-%d-%H-%M-%S.wav"`
-Mac (Development): `python recorder.py -d 0 rec-test-%Y-%m-%d-%H-%M-%S.wav`
-Webserver only (Development): `flask run` (API usually on port 5000, open /public/index.html)
-
-## Architecture
-
-Update: Recording from Stream added. Currently in Testing.
-
-`python recorder.py --port 5000 --airtime-conf local-secret/airtime.conf --stream https://st02.sslstream.dlf.de/dlf/02/128/mp3/stream.mp3 rec-test-%Y-%m-%d-%H-%M-%S.mp3`
-
-### `recorder.py`
-
-(parent process)
-
-Simple recorder build with `python-sounddevice` to record form a given input device to a wav file.
-
-Based on: https://python-sounddevice.readthedocs.io/en/0.3.14/examples.html#recording-with-arbitrary-duration
-
-### `app.py`
-
-(child process)
-
-Simple API build with Flask to control the recorder, and proxy requests to the Airtime API (which otherwise would need authentication).
+`recorder.py --port 5000 --airtime-conf airtime.conf --stream https://st02.sslstream.dlf.de/dlf/02/128/mp3/stream.mp3 rec-test_%station_%Y-%m-%d-%H-%M-%S_%label.mp3
 
 ## API
 
