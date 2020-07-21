@@ -8,7 +8,7 @@
 SERVICE_USER=angrezi
 SERVICE_NAME=angrezi-live-recorder
 
-VIRTUALENV= $DEPLOY_DEST/../venv
+VIRTUALENV="$DEPLOY_DEST/../venv"
 
 sudo systemctl stop $SERVICE_NAME
 
