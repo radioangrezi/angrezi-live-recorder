@@ -5,7 +5,7 @@
 # accessible var DEPLOY_FROM
 
 # run as angrezi user
-SERVICE_USER=angrezi
+SERVICE_USER=live-recorder
 SERVICE_NAME=angrezi-live-recorder
 
 VIRTUALENV="$DEPLOY_DEST/../venv"
