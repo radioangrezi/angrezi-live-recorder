@@ -14,7 +14,7 @@ sudo systemctl stop $SERVICE_NAME
 
 # make virtualenv
 if [ ! -d "$VIRTUALENV" ]; then
-    virtualenv -p python2 $VIRTUALENV
+    sudo -u $SERVICE_USER virtualenv -p python2 $VIRTUALENV
 fi
 
 # remove and deploy all files
