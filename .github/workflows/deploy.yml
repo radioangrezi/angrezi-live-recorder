@@ -50,8 +50,8 @@ jobs:
 #         pytest
     - name: Lint Deploy Scripts
       uses: azohra/shell-linter@latest
-        with:
-          path: ".environment"
+      with:
+        path: ".environment"
       
     - name: Deploy Application
       run: sudo /opt/services/run-deploy.sh ${{ github.event.repository.name }}
