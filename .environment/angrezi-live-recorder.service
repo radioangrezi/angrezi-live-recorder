@@ -11,8 +11,8 @@ TimeoutStopSec=10
 Restart=on-failure
 RestartSec=5
 
-User=angrezi
-Group=angrezi
+User=live-recorder
+Group=live-recorder
 
 [Install]
 WantedBy=default.target
