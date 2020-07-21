@@ -27,8 +27,7 @@ sudo cp -r $DEPLOY_FROM/. $DEPLOY_DEST
 sudo chown -R $SERVICE_USER:$SERVICE_USER $DEPLOY_DEST
 
 # update virtualenv
-source $VIRTUALENV/bin/activate
-pip install -r $DEPLOY_DEST/requirements.txt
+sudo -u $SERVICE_USER source $VIRTUALENV/bin/activate && pip install -r $DEPLOY_DEST/requirements.txt
 
 # restart service
 sudo systemctl restart $SERVICE_NAME
