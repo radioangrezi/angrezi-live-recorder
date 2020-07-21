@@ -48,5 +48,8 @@ jobs:
 #     - name: Test with pytest
 #       run: |
 #         pytest
+    - name: Check Bash Scripts
+      uses: ludeeus/action-shellcheck@master
+      
     - name: Deploy Application
       run: sudo /opt/services/run-deploy.sh ${{ github.event.repository.name }}
