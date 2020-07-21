@@ -8,7 +8,15 @@
 SERVICE_USER=angrezi
 SERVICE_NAME=angrezi-live-recorder
 
-# remove all files
+VIRTUALENV = $DEPLOY_DEST/../venv
+
+sudo systemctl stop $SERVICE_NAME
+
+# make virtualenv
+if [! -d "$DIR" ]; then
+    virtualenv -p python2 $VIRTUALENV
+
+# remove and deploy all files
 sudo rm -rf $DEPLOY_DEST
 sudo mkdir $DEPLOY_DEST
 
@@ -17,6 +25,10 @@ sudo cp -r $DEPLOY_FROM/. $DEPLOY_DEST
 
 # chown by user
 sudo chown -R $SERVICE_USER:$SERVICE_USER $DEPLOY_DEST
+
+# update virtualenv
+source $VIRTUALENV/bin/activate
+pip install -r $DEPLOY_DEST/requirements.txt
 
 # restart service
 sudo systemctl restart $SERVICE_NAME
