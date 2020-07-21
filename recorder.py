@@ -1,328 +1,381 @@
-#!/usr/bin/env python3
-"""
+#!/usr/bin/env python2
 
-Record form a local sound device in with (almost) arbitrary duration.
-Files fill be cut when max size for wav of 4 GB is reached.
-Allows remote triggerd cuts via HTTP request. Does not start automatically.
+# RADIO ANGREZI
+# WEB (STREAM) RECORDER
+# 2020-07-20, ja
 
-Based on: https://python-sounddevice.readthedocs.io/en/0.3.14/examples.html#recording-with-arbitrary-duration
+# This is a micro-web-service.
+# It will let you do these simple things:
 
-"""
-import argparse
-import tempfile
-import sys
-import signal
-from datetime import datetime
-import time
-import threading
-from enum import Enum
-import os, sys
+# + record a web audio stream to disk (via streamripper)
+# + no more: record from a local sound input to disk (this feature was part of v1)
+# + connect to the Airtime / Libretime API to fetch a show schedule / metadata
+# + auto-start the recording when a next show start
+# + manually start and and stop a recording
+# + set a name for the recorded file
+# + auto generate a name form the show meta data using the API
+# + auto-schedule recordings
+# + auto-finish recordings after duration
+
+# The service is called and configured only via command line arguments.
+# Each recording is handeled in a separate process (streamripper).
+# (v1 showed that doing the recording in python causes high CPU utilization and synchronizing problems.)
+
+# Requirements_
+# + streamrippper (binary), alternative: python-streamripper or radiorec
+# + flask
+# + airtime_api (REQUIRES PYTHON 2!)
+
+
+from future.standard_library import install_aliases
+install_aliases()
+
+from flask import Flask
+from flask import jsonify
+from flask import request
 from flask_cors import CORS
-import multiprocessing
-import logging
-import numpy
-import subprocess 
+import logging, os
+import threading
+import argparse
+import datetime
+import subprocess
+from urllib.request import urlopen, urlparse
+import signal
+import sys
 
-# python 2/3 compatible
-try: 
-    import queue
-except ImportError:
-    import Queue as queue
+app = Flask(__name__)
+cors = CORS(app, resources={r"/*": {"origins": "*"}})
 
-def int_or_str(text):
-    """Helper function for argument parsing."""
-    try:
-        return int(text)
-    except ValueError:
-        return text
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.WARNING)
+logging.basicConfig(level=logging.WARNING)
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument(
-    '-l', '--list-devices', action='store_true',
-    help='show list of audio devices and exit')
-parser.add_argument(
-    '-d', '--device', type=int_or_str,
-    help='input device (numeric ID or substring). Cant be used with --stream.')
-parser.add_argument(
-    '-r', '--samplerate', type=int, default=4400, help='sampling rate')
-parser.add_argument(
-    '-c', '--channels', type=int, default=2, help='number of input channels')
-parser.add_argument(
-    '-t', '--subtype', type=str, help='sound file subtype (e.g. "PCM_24")')
-parser.add_argument(
-    '-p', '--port', type=int, help='web server port for API requests. if empty server will not be started.')
-parser.add_argument(
-    '--debug', help='Output DEBUG log.', action='store_true')
-parser.add_argument(
-    '--airtime-conf', type=str, help='Airtime config file to read. Usually: /etc/airtime/airtime.conf')
-parser.add_argument(
-    'filename', nargs='?', metavar='FILENAME', help='audio file to store recording to')
+# parser.add_argument(
+#     '-l', '--list-devices', action='store_true',
+#     help='show list of audio devices and exit')
+# parser.add_argument(
+#     '-d', '--device', type=int_or_str,
+#     help='input device (numeric ID or substring). Cant be used with --stream.')
+# parser.add_argument(
+#     '-r', '--samplerate', type=int, default=4400, help='sampling rate')
+# parser.add_argument(
+#     '-c', '--channels', type=int, default=2, help='number of input channels')
+# parser.add_argument(
+#     '-t', '--subtype', type=str, help='sound file subtype (e.g. "PCM_24")')
 parser.add_argument(
     '-s', '--stream', type=str,
     help='Stream url to record with streamripper. Cant be used with --device.')
+parser.add_argument(
+    '-p', '--port', type=int, help='web server port for API requests. if empty server will not be started.')
+parser.add_argument(
+    '--debug', help='Output debug messages.', action='store_true')
+parser.add_argument(
+    '--airtime-conf', type=str, help='Airtime config file to read. Usually: /etc/airtime/airtime.conf')
+parser.add_argument(
+    'filename', nargs='?', metavar='FILENAME', help='audio file to store recording to. Use %station and %label to include metadata, strftime() codes for time.')
 args = parser.parse_args()
 
-# recording states
+# uses api_client.py (from source libretime/python_apps/api_clients/api_clients/api_client.py)
+# from past.translation import autotranslate
+# autotranslate('api_client')
+# autotranslation did not work.
+from api_client import AirtimeApiClient
+airtime_api = None
 
-class STATES(Enum):
+DEFAULT_FILENAME = "stream-rec_%station_%Y-%m-%d-%H-%M-%S.ext"
+MAX_DURATION_IN_SEC = 24 * 60 * 60 # 24h
+MAX_SILENCE_IN_SEC = 60 * 10 # 10min
+
+class STATES(object):
     ERROR = -2
     CUTTING = -1
     IDLE = 0
     RECORDING = 1
     STOPPED = 2
 
-# signal to start and stop recording
+#########
+# HELPERS
+#########
 
-class SignalEvent(object):
-
-    value = False
-
-    def is_set(self):
-        return self.value
-
-    def set(self, value):
-        self.value = value
-
-    def clear(self):
-        self.value = False
-
-interrupt = SignalEvent()
-recording_on_off = False
-
-def receive_signal_start(signum, stack):
-    global recording_on_off, interrupt
-    interrupt.set(False)
-    recording_on_off = True
-
-def receive_signal_stop(signum, stack):
-    global recording_on_off, interrupt
-    interrupt.set(True)
-    recording_on_off = False
-
-def receive_signal_cut(signum, stack):
-    global recording_on_off, interrupt
-    interrupt.set(True)
-    recording_on_off = True
-
-signal.signal(signal.SIGUSR1, receive_signal_start)
-signal.signal(signal.SIGUSR2, receive_signal_stop)
-signal.signal(signal.SIGALRM, receive_signal_cut)
-
-# these are shared between processes
-
-recording_start_timestamp = multiprocessing.Value('d', 0)
-
-def set_recording_timestamp(timestamp):
-    recording_start_timestamp.value = timestamp
-
-recording_state = multiprocessing.Value('i', 0)
-
-def set_recording_state(enum):
-    recording_state.value = enum.value
-def get_recording_state_enum(state):
-    return STATES(state.value)
-
-recording_filename_recv , recording_filename_send = multiprocessing.Pipe(duplex=False)
-recording_showslug_recv , recording_showslug_send = multiprocessing.Pipe(duplex=False)
-
-# WEB API in a separate process
-
-from app import flaskThread, connect_to_airtime_api
-shared = {}
-shared['recording_start_timestamp'] = recording_start_timestamp
-shared['recording_state'] = recording_state
-shared['recording_showslug_send'] = recording_showslug_send
-shared['recording_filename_recv'] = recording_filename_recv
-shared['STATES'] = STATES
-
-api_server = None
-
-DEVICE = 'device'
-STREAM = 'stream'
-SOURCE = None
-
-def start_api_server(port=5000):
-    global api_server
-    if __name__ == "__main__":
-        connect_to_airtime_api(args.airtime_conf)
-        api_server = multiprocessing.Process(target=flaskThread, kwargs={'shared':shared,'port':port,'debug':args.debug,'rec_pid':os.getpid()})
-        api_server.start()
-
-# AUDIO RECORDER - based on https://python-sounddevice.readthedocs.io/en/0.3.12/examples.html#recording-with-arbitrary-duration
-
-logging.basicConfig()
-log = logging.getLogger('recorder')
-
-if args.debug:
-    log.setLevel(logging.DEBUG)
-else:
-    log.setLevel(logging.INFO)
-
-try:
-    import sounddevice as sd
-    import soundfile as sf
-
-    if args.list_devices:
-        print(sd.query_devices())
-        parser.exit(0)
-
-    if args.filename is None:
-        print("Error: No filename argument provided. Use -h for help.")
-        parser.exit(0)
-
-    if args.stream is not None and args.device is not None:
-        print("Error: Audio device and stream url rguments given! Use --stream to record from stream url OR --device to record from local device. Use -h for help.")
-        parser.exit(0)
-
-    if args.stream is not None:
-        SOURCE = STREAM
-    else:
-        SOURCE = DEVICE
-
-    # only start api server if port argument is set. just record if not.
-    if args.port:
-        start_api_server(port=args.port)
-    else:
-        # autostart recording if no webserver
-        recording_on_off = True
-
-    if args.samplerate is None:
-        device_info = sd.query_devices(args.device, 'input')
-        # soundfile expects an int, sounddevice provides a float:
-        args.samplerate = int(device_info['default_samplerate'])
-
-    q = queue.Queue()
-
-    import copy
-
-    def callback(indata, frames, time, status):
-        """This is called (from a separate thread) for each audio block."""
-        if status:
-            print("%i: %s" % (frames, status))
-        q.put(indata.copy())
-
-    def record_to_file(filename):
-        global recording_state, recording_start_timestamp
-        max_data_size = numpy.iinfo(numpy.int32).max + 8# unsigned int
-        log.debug("Max data size of wav: %i" % max_data_size)
-        # Make sure the file is opened before recording anything:
-        with sf.SoundFile(filename, mode='x', samplerate=args.samplerate,
-                          channels=args.channels, subtype=args.subtype) as file:
-            with sd.InputStream(samplerate=args.samplerate, device=args.device,
-                                channels=args.channels, callback=callback,
-                                blocksize=16, dtype='int16') as input:
-                set_recording_timestamp(time.mktime(datetime.now().timetuple()))
-                frame_size = file.channels * numpy.dtype(input.dtype).itemsize
-                # recordning loop: running once per frame (or until q is empty)
-                while True: 
-                    # enforce a hard limit on the file size (wav max: ~ 4 GB)
-                    data_size = len(file) * frame_size
-                    # log.debug("Current data size: %i" % data_size)
-                    if interrupt.is_set() and data_size < 10:
-                        # two cuts without any data in between.
-                        # skip cut
-                        interrupt.clear()
-
-                    if interrupt.is_set() or data_size >= max_data_size:
-                        interrupt.clear()
-                        log.info("Recorder: making cut")
-                        log.info('Recorder: Finished file ' + repr(filename))
-                        file.close()
-                        set_recording_state(STATES.IDLE)
-                        return -1 # stop / end of recording (need new filename)
-                    else:
-                        set_recording_state(STATES.RECORDING)
-                        file.write(q.get())
-
-    def record_stream_to_file(filename):
-        global recording_state, recording_start_timestamp
-        # alternative: https://github.com/jpaille/streamripper
-        ripper = subprocess.Popen([
-            'streamripper',
-            args.stream,
-            #'-d',
-            #'./streams',
-            #'-l',
-            #'10800',
-            '-A',
-            '-a',
-            filename
-        ])
-        set_recording_timestamp(time.mktime(datetime.now().timetuple()))
-        # enforce a hard limit on the file size (wav max: ~ 4 GB). THIS IS MP3, now!
-        set_recording_state(STATES.RECORDING)
-        time.sleep(600)
-        if interrupt.is_set():
-            interrupt.clear()
-            log.info("Recorder: making cut")
-            log.info('Recorder: Finished file ' + repr(filename))
-            ripper.terminate()
-            try:
-                os.system("rm *.cue")
-            except:
-                pass
-            set_recording_state(STATES.IDLE)
-            return -1 # stop / end of recording (need new filename)
-        print('cleanup')
-        ripper.terminate()
+def slugify(value):
+    """
+    Normalizes string, converts to lowercase, removes non-alpha characters,
+    and converts spaces to hyphens.
+    """
+    import unicodedata, re
+    value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
+    value = unicode(re.sub('[^\w\s-]', '', value).strip().lower())
+    value = unicode(re.sub('[-\s]+', '-', value))
+    return value
 
 
-    def generate_filename_and_directory():
-        # add date and time to filename
-        filename = datetime.now().strftime(args.filename)
+#########
+# DATA MODEL
+#########
 
-        # get show name from pipe and add to filename if available
-        if recording_showslug_recv.poll():
-            recording_filename = recording_showslug_recv.recv()
-            if recording_filename and recording_filename is not "":
-                name, extension = os.path.splitext(filename)
-                filename = name + "_" + recording_filename + extension
 
-        # send full filename back to (another) pipe to the frontend
-        recording_filename_send.send(filename)
+class StreamRecorderWithAirtime(object):
+
+    # class variables
+    process = None
+
+    # url =
+    # start_time = None
+    # end_duration = None
+    # max_duration = time.timedelta(hours=24)
+    filename_pattern = DEFAULT_FILENAME
+    #directory = None
+    process = None
+
+    def __init__(self, url, filename_pattern = DEFAULT_FILENAME):
+        self.start_time = None
+
+        # check if url exists, fails if it does not
+        urlopen(url)
+        self.url = url
+        url_name, self.extension = os.path.splitext(url)
+        self.filename_pattern, filename_extension = os.path.splitext(filename_pattern)
+        self.station_name = slugify(unicode(urlparse(url).netloc))
+
+        self.directory = None
+        self.filename = None
+        self._filename = None
+
+    def start(self):
+        self.start_time = datetime.datetime.now()
+        self.generate_filename_and_directory(label='incomplete')
+        self.record_stream_to_file()
+
+    def stop(self):
+        if not self.running(): return
+        self.stop_recording()
+        self.update_filename()
+
+    def duration(self):
+        try:
+            return datetime.datetime.now() - self.start_time
+        except TypeError:
+            return datetime.timedelta()
+
+    @classmethod
+    def running(cls):
+        if cls.process:
+            return cls.process.poll() is None
+        else:
+            return False
+
+    def update_filename(self):
+        # get show name form API and add to filename if available
+        # TODO make API / source pluggable, so you are not dependend on Airtime
+        # TODO allow for a custom name that is added
+        name = get_show_name()
+        if name and name is not "":
+            self.generate_filename_and_directory(label=name)
+        else:
+            self.generate_filename_and_directory(label='')
+
+        print(os.path.join(self.directory, self.filename))
+        os.rename(os.path.join(self.directory, self._filename), os.path.join(self.directory, self.filename))
+        self._filename = self.filename
+
+    def generate_filename_and_directory(self, label='unnamed'):
+        filename = self.filename_pattern
+        filename = filename.replace('%station', self.station_name)
+        filename = filename.replace('%label', label)
+        filename = self.start_time.strftime(filename)
+        filename = filename.strip(" _.")
+        filename += self.extension
+
         log.info('Recorder: Starting file ' + repr(filename))
 
         directory = os.path.dirname(filename) or os.getcwd()
         if not os.path.exists(directory):
             os.makedirs(directory)
 
-        return filename
+        self.directory = directory
+        self.filename = filename
+
+    def record_stream_to_file(self):
+        # alternative to streamripper: https://github.com/jpaille/streamripper
+        # TODO add max duration
+        # TODO remove .cue files
+        log.info('Recorder: Starting streamripper')
+        self._filename = self.filename.replace('%', '') # make sure no tokens are left. otherwise we will not find the file again.
+        # streamripper manpage: http://manpages.ubuntu.com/manpages/bionic/man1/streamripper.1.html
+        self.__class__.process = subprocess.Popen([
+            'streamripper',
+            self.url,
+            '-l', # Run for a predetermined length of time, in seconds
+            str(MAX_DURATION_IN_SEC),
+            '-A', # Don't create individual tracks
+            '-o',
+            'never', # never overwrite files
+            '-t', # Don't overwrite tracks in incomplete directory
+            '--debug' if args.debug else '',
+            '--xs_silence_length=' + str(MAX_SILENCE_IN_SEC),
+            '--xs2', # Use capisce's new algorithm (Apr 2008) for silence detection.
+            '--codeset-metadata=utf8',
+            #'-i', # dont add id3
+            '-s', # no subfolder for each stream
+            '-a',  # Dont create individual files. Set pattern for output filename. Will create .cue.
+            self._filename
+        ])
+        self.start_time = datetime.datetime.now() # update starttime for more precision
+        #set_recording_state(STATES.RECORDING)
+
+    def stop_recording(self):
+        if not self.running(): return
+        log.info('Recorder: Finishing file ' + repr(self._filename))
+        self.__class__.process.terminate()
+        self.__class__.process.wait()
+        log.info('Recorder: Streamripper terminated')
+        # you can not get rid of the .cue, if you use the -a flag, which we need.
+        try:
+            os.system("rm *.cue")
+        except:
+            pass
+            #set_recording_state(STATES.IDLE)
+
+#########
+# RECORDER PROCESS
+#########
+
+RECORDER = StreamRecorderWithAirtime(args.stream, args.filename)
+
+#########
+# DIRECT AIRTIME API "PROXY"
+#########
+
+from flask import Response
+import json
+
+#@app.route("/airtime/live-info-v2/")
+
+@app.route("/airtime/live-info/")
+def get_live_info():
+    response = airtime_api.get_live_info()
+    return Response(json.dumps(response), status=200, mimetype='application/json')
+
+@app.route("/airtime/on-air-light/")
+def get_on_air_light():
+    response = airtime_api.get_on_air_light()
+    return Response(json.dumps(response), status=200, mimetype='application/json')
+
+@app.route("/airtime/bootstrap-info/")
+def get_bootstrap_info():
+    response = airtime_api.get_bootstrap_info()
+    return Response(json.dumps(response), status=200, mimetype='application/json')
+
+#########
+# ACTIONS: not used in production
+#########
+
+@app.route("/disconnect-master/")
+def disconect_master():
+    response = airtime_api.notify_source_status('master_dj', 'false')
+    return Response(json.dumps(response), status=200, mimetype='application/json')
+
+@app.route("/connect-master/")
+def connect_master():
+    response = airtime_api.notify_source_status('master_dj', 'true')
+    return Response(json.dumps(response), status=200, mimetype='application/json')
+
+#########
+# CUSTOM STATUS API
+#########
+
+@app.route("/status-summary/")
+def get_status_summary():
+    response = {}
+    response['recorder'] = get_recorder_status()
+    if airtime_api:
+        response['live_info'] = airtime_api.get_live_info()
+        response['on_air_light'] = airtime_api.get_on_air_light()
+    return Response(json.dumps(response), status=200, mimetype='application/json')
 
 
-    i = 0
-    # file loop: runs once per recordning, waiting (ideling) unlimitedly until a new recoring shall start
-    print('#' * 80)
-    print('press Ctrl+C to stop the recording')
-    print('#' * 80)
-    while True:
-        # do not run if (requested) state is not off (False)
-        if recording_on_off:
-            if SOURCE is STREAM:
-                filename = generate_filename_and_directory()
-                print('recording from stream...')
-                if record_stream_to_file(filename) != -1:
-                    break
-                i = i + 1
-            else:
-                filename = generate_filename_and_directory()
-                print('recording from device...')
-                if record_to_file(filename) != -1:
-                    break
-                i = i + 1
-        time.sleep(1)
+#########
+# RECORDER API
+#########
 
-except KeyboardInterrupt:
-    if api_server:
-        api_server.terminate()
-        api_server.join()
+current_filename = None
 
+
+def get_recorder_status():
+    if RECORDER.running():
+        label = "%s: %s" % ("REC", str(RECORDER.duration()).split('.')[0])
+        filename = RECORDER.filename
+        return { 'status': STATES.RECORDING, 'text': label, 'filename': filename }
+    else:
+        return { 'status': STATES.IDLE, 'text': "IDLE", 'filename': '-'}
+
+
+def get_show_name():
+    live_info = airtime_api.get_live_info()
+    if live_info and live_info['currentShow'] and live_info['currentShow'][0] and live_info['currentShow'][0]['name']:
+        name = slugify(live_info['currentShow'][0]['name'])
+        return name
+
+
+@app.route("/recording-request-cut/")
+def cut():
+    RECORDER.stop()
+    RECORDER.start()
+    return Response("New file requested.", status=200, mimetype='application/json')
+
+
+@app.route("/recording-disconnect-stop/")
+def disconnect_stop():
+    RECORDER.stop()
+    response = airtime_api.notify_source_status('master_dj', 'false')
+    # gives no response on success or failure :/
+    return Response("Disconnection of Master Source (master_dj) requested.", status=200, mimetype='application/json')
+
+
+@app.route("/recording-connect-start/")
+def connect_start():
+    RECORDER.start()
+    response = airtime_api.notify_source_status('master_dj', 'true')
+    # gives no response on success or failure :/
+    return Response("Connection of Master Source (master_dj) requested.", status=200, mimetype='application/json')
+
+
+@app.route("/recording-stop/")
+def rec_stop():
+    RECORDER.stop()
+    return Response("Recording stopped.", status=200, mimetype='application/json')
+
+
+@app.route("/recording-start/")
+def rec_start():
+    RECORDER.start()
+    return Response("Recording started.", status=200, mimetype='application/json')
+
+
+def connect_to_airtime_api(airtime_config='airtime.conf'):
+    return AirtimeApiClient(config_path=airtime_config)
+    if not airtime_api.is_server_compatible():
+        raise Exception("Server is not compatible with API.")
+        quit()
+
+
+if __name__ == "__main__":
+
+    if args.airtime_conf:
+        airtime_api = connect_to_airtime_api(args.airtime_conf)
+
+    port = args.port or None # default port 5000
+    debug = args.debug or False
+
+    logging.info("Starting Webserver at %i" % port)
+    app.run(port=port, host='localhost', debug=debug)
+
+    print("Shutting down...")
+    RECORDER.stop()
     try:
         os.system("rm *.cue")
-    except:
+    except OSError:
         pass
-    set_recording_state(STATES.ERROR)
-    parser.exit(0)
 
-except Exception as e:
-    set_recording_state(STATES.ERROR)
-    parser.exit(type(e).__name__ + ': ' + str(e))
+    parser.exit(0)

@@ -238,7 +238,7 @@ class AirtimeApiClient(object):
     def is_server_compatible(self, verbose=True):
         logger = self.logger
         api_version = self.__get_api_version()
-        # logger.info('Airtime version found: ' + str(version))
+        logger.info('Airtime version found: ' + str(api_version))
         if api_version == -1:
             if verbose:
                 logger.info('Unable to get Airtime API version number.\n')

@@ -10,7 +10,7 @@ State: **Beta** (Check `app.py` for a to do list.)
 
 ## Requirements
 
-- Python 2.7 (3.X is not supported by `api_client.py`)
+- Python 2.7 (3.X is not supported by `api_client.py)
 - pip and virtualenv (recommended)
 - python-sounddevice supported soundcard as input device
 - install requirements via `pip install -r requirements.txt`
@@ -31,8 +31,7 @@ Webserver only (Development): `flask run` (API usually on port 5000, open /publi
 
 Update: Recording from Stream added. Currently in Testing.
 
-Dev --stream: `python recorder.py --port 5000 --airtime-conf local-secret/airtime.conf --stream https://st02.sslstream.dlf.de/dlf/02/128/mp3/stream.mp3 rec-test-%Y-%m-%d-%H-%M-%S.mp3`
-Dev -d `python recorder.py -d 0 --port 5000 --airtime-conf local-secret/airtime.conf rec-test-%Y-%m-%d-%H-%M-%S.wav`
+`python recorder.py --port 5000 --airtime-conf local-secret/airtime.conf --stream https://st02.sslstream.dlf.de/dlf/02/128/mp3/stream.mp3 rec-test-%Y-%m-%d-%H-%M-%S.mp3`
 
 ### `recorder.py`
 
