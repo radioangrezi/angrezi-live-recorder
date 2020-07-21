@@ -176,8 +176,11 @@ class StreamRecorderWithAirtime(object):
             self.generate_filename_and_directory(label='')
 
         print(os.path.join(self.directory, self.filename))
-        os.rename(os.path.join(self.directory, self._filename), os.path.join(self.directory, self.filename))
-        self._filename = self.filename
+        try:
+            os.rename(os.path.join(self.directory, self._filename), os.path.join(self.directory, self.filename))
+            self._filename = self.filename
+        except OSError:
+            pass
 
     def generate_filename_and_directory(self, label='unnamed'):
         filename = self.filename_pattern
@@ -235,13 +238,6 @@ class StreamRecorderWithAirtime(object):
             os.system("rm *.cue")
         except:
             pass
-            #set_recording_state(STATES.IDLE)
-
-#########
-# RECORDER PROCESS
-#########
-
-RECORDER = StreamRecorderWithAirtime(args.stream, args.filename)
 
 #########
 # DIRECT AIRTIME API "PROXY"
@@ -312,6 +308,7 @@ def get_recorder_status():
 
 
 def get_show_name():
+    if not airtime_api: return None
     live_info = airtime_api.get_live_info()
     if live_info and live_info['currentShow'] and live_info['currentShow'][0] and live_info['currentShow'][0]['name']:
         name = slugify(live_info['currentShow'][0]['name'])
@@ -354,10 +351,11 @@ def rec_start():
 
 
 def connect_to_airtime_api(airtime_config='airtime.conf'):
-    return AirtimeApiClient(config_path=airtime_config)
+    airtime_api = AirtimeApiClient(config_path=airtime_config)
     if not airtime_api.is_server_compatible():
         raise Exception("Server is not compatible with API.")
         quit()
+    return airtime_api
 
 
 if __name__ == "__main__":
@@ -367,6 +365,8 @@ if __name__ == "__main__":
 
     port = args.port or None # default port 5000
     debug = args.debug or False
+
+    RECORDER = StreamRecorderWithAirtime(args.stream, args.filename)
 
     logging.info("Starting Webserver at %i" % port)
     app.run(port=port, host='localhost', debug=debug)
