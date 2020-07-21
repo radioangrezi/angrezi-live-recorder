@@ -8,13 +8,14 @@
 SERVICE_USER=angrezi
 SERVICE_NAME=angrezi-live-recorder
 
-VIRTUALENV = $DEPLOY_DEST/../venv
+VIRTUALENV= $DEPLOY_DEST/../venv
 
 sudo systemctl stop $SERVICE_NAME
 
 # make virtualenv
 if [! -d "$DIR" ]; then
     virtualenv -p python2 $VIRTUALENV
+fi
 
 # remove and deploy all files
 sudo rm -rf $DEPLOY_DEST
