@@ -54,4 +54,4 @@ jobs:
         path: ".environment"
       
     - name: Deploy Application
-      run: sudo run-deploy.sh ${{ github.event.repository.name }}
+      run: sudo /usr/local/sbin/run-deploy.sh ${{ github.event.repository.name }}
