@@ -1,13 +1,17 @@
 # This workflow will install Python dependencies, run tests and lint with a single version of Python
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Deploy
+name: Deploy to Angrezi Server
 
 on:
   push:
     branches: [ master ]
+    paths-ignore:
+    - '.environment/**'
   pull_request:
     branches: [ master ]
+    paths-ignore:
+    - '.environment/**'
 
 jobs:
   build:
@@ -44,5 +48,10 @@ jobs:
 #     - name: Test with pytest
 #       run: |
 #         pytest
+    - name: Lint Deploy Scripts
+      uses: azohra/shell-linter@latest
+      with:
+        path: ".environment"
+      
     - name: Deploy Application
-      run: sudo /opt/services/run-deploy.sh ${{ github.event.repository.name }}
+      run: sudo /usr/local/sbin/run-deploy.sh ${{ github.event.repository.name }}
