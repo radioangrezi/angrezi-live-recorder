@@ -42,13 +42,16 @@ import subprocess
 from urllib.request import urlopen, urlparse
 import signal
 import sys
+from airtime_schedule import AirtimeRecordingScheduler, scheduler
 
 app = Flask(__name__)
 cors = CORS(app, resources={r"/*": {"origins": "*"}})
 
-log = logging.getLogger('werkzeug')
+werkzeug_log = logging.getLogger('werkzeug')
+werkzeug_log.setLevel(logging.WARNING)
+
+log = logging.getLogger(__name__)
 log.setLevel(logging.WARNING)
-logging.basicConfig(level=logging.WARNING)
 
 parser = argparse.ArgumentParser(description=__doc__)
 # parser.add_argument(
@@ -75,6 +78,9 @@ parser.add_argument(
 parser.add_argument(
     'filename', nargs='?', metavar='FILENAME', help='audio file to store recording to. Use %station and %label to include metadata, strftime() codes for time.')
 args = parser.parse_args()
+
+if args.debug:
+    log.setLevel(logging.DEBUG)
 
 # uses api_client.py (from source libretime/python_apps/api_clients/api_clients/api_client.py)
 # from past.translation import autotranslate
@@ -142,12 +148,18 @@ class StreamRecorderWithAirtime(object):
         self.filename = None
         self._filename = None
 
-    def start(self):
+    def start(self, name=None):
+        if self.running(): return
         self.start_time = datetime.datetime.now()
         self.generate_filename_and_directory(label='incomplete')
         self.record_stream_to_file()
+        if not name:
+            self.name = get_show_name()
+        else:
+            self.name = slugify(name)
 
     def stop(self):
+        log.info("Recording stop called.")
         if not self.running(): return
         self.stop_recording()
         self.update_filename()
@@ -169,9 +181,8 @@ class StreamRecorderWithAirtime(object):
         # get show name form API and add to filename if available
         # TODO make API / source pluggable, so you are not dependend on Airtime
         # TODO allow for a custom name that is added
-        name = get_show_name()
-        if name and name is not "":
-            self.generate_filename_and_directory(label=name)
+        if self.name and self.name is not "":
+            self.generate_filename_and_directory(label=self.name)
         else:
             self.generate_filename_and_directory(label='')
 
@@ -232,7 +243,7 @@ class StreamRecorderWithAirtime(object):
         log.info('Recorder: Finishing file ' + repr(self._filename))
         self.__class__.process.terminate()
         self.__class__.process.wait()
-        log.info('Recorder: Streamripper terminated')
+        log.info('Recorder: Streamripper terminated.')
         # you can not get rid of the .cue, if you use the -a flag, which we need.
         try:
             os.system("rm *.cue")
@@ -367,9 +378,11 @@ if __name__ == "__main__":
     debug = args.debug or False
 
     RECORDER = StreamRecorderWithAirtime(args.stream, args.filename)
+    SCHEDULE = AirtimeRecordingScheduler(airtime_api, RECORDER)
 
-    logging.info("Starting Webserver at %i" % port)
-    app.run(port=port, host='localhost', debug=debug)
+    log.info("Starting Webserver at %i" % port)
+    # Do not use run(debug=True)! It will run a second instance of the process, thus a second scheduler etc.
+    app.run(port=port, host='localhost')
 
     print("Shutting down...")
     RECORDER.stop()

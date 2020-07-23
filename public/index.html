@@ -44,10 +44,11 @@
                             window.status_update.ui_show_info(Boolean(current_show_info), current_show_info)
 
                             // master source status
-                            window.master_source_status = data.live_info && data.live_info['source_enabled'] && data.live_info['source_enabled'] == "Master"
-                            window.status_update.ui_master_source_status(window.master_source_status)
+                            //window.master_source_status = data.live_info && data.live_info['source_enabled'] && data.live_info['source_enabled'] == "Master"#}
+                            //window.status_update.ui_master_source_status(window.master_source_status)#}
 
                             // recorder
+                            window.recorder_status = data.recorder
                             window.status_update.ui_live_recorder_status(data.recorder)
                             
                         });
@@ -76,30 +77,18 @@
                     }
                 },
 
-                ui_master_source_status: function(status){
-                    if(window.master_source_status){
-                        $master_source_status.innerHTML = "CONNECTED"
-                        $master_source_status.style = "background: #0069ed;";
-
-                        $btn_start_stop.querySelector("p").innerHTML = "Disconnect + Stop Recording"
-                        $btn_start_stop.style = "background: red;"
-                    }else {
-                        $master_source_status.innerHTML = "DISCONNECTED"
-                        $master_source_status.style = "background: grey";
-
-                        $btn_start_stop.querySelector("p").innerHTML = "Connect + Start Recording"
-                        $btn_start_stop.style = "background: #0069ed;"
-                    }
-                },
-
                 ui_live_recorder_status: function(data){
                     live_recorder.status_elem.innerHTML = data.text
                     if(data.status < 0){
                         live_recorder.status_elem.style = "background: yellow; color: black;";
                     }else if(data.status == 0){
                         live_recorder.status_elem.style = "background: gray";
+                        $btn_start_stop.querySelector("p").innerHTML = "Start Recording"
+                        $btn_start_stop.style = "background: #0069ed;"
                     }else if(data.status == 1){
                         live_recorder.status_elem.style = "background: red";
+                        $btn_start_stop.querySelector("p").innerHTML = "Stop Recording"
+                        $btn_start_stop.style = "background: red;"
                     } if(data.status > 1){
                         live_recorder.status_elem.style = "background: blue";
                     }
@@ -144,10 +133,10 @@
                 },
 
                 toggle_start_stop: function(){
-                    if(window.master_source_status){
-                        api_method = '/recording-disconnect-stop/'
+                    if(window.recorder_status.status >= 1){
+                        api_method = '/recording-stop/'
                     }else {
-                        api_method = '/recording-connect-start/'
+                        api_method = '/recording-start/'
                     }
                     fetch(window.API_HOST + api_method)
                     .then((res) => {
@@ -182,10 +171,10 @@
                     <dt>Filename</dt><dd id="current-filename">–</dd>
                 </dl>
             </section>
-            <section id="master-source" class="box">
+<!--            <section id="master-source" class="box">
                 <h2 class="module-label label">Studio Speicher XI (Master Source)</h2>
                 <p class="status module-row">IDLE</p>
-            </section>
+            </section>-->
             <section id="live-recorder" class="box">
                 <h2 class="module-label label">Live Stream Recorder</h2>
 <!--                 <div class="module-row">
@@ -202,7 +191,7 @@
                     <small class="warning">double click</small>
                 </button>
                 <button class="btn-red button module-row doubleclick" id="btn-start-stop" ondblclick="live_recorder.toggle_start_stop()">
-                    <p>Disconnect + Stop Recording</p>
+                    <p>Stop Recording</p>
                     <small class="warning">double click</small>
                 </button>
             </section>
