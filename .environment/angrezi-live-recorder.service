@@ -4,7 +4,7 @@ Description=Angrezi Live Recorder with remote cutting
 [Service]
 Type=simple
 # EnvironmentFile=/opt/services/angrezi-live-recorder/.env
-ExecStart=/opt/services/angrezi-live-recorder/venv/bin/python /opt/services/angrezi-live-recorder/run/recorder.py --port 5000 --airtime-conf /etc/airtime/airtime.conf --stream http://stream.radioangrezi.de:8000/live "%%Y/%%m/%%d/radio-angrezi-live-%%Y-%%m-%%d-%%H-%%M-%%S_%%label.wav"
+ExecStart=/opt/services/angrezi-live-recorder/venv/bin/python /opt/services/angrezi-live-recorder/run/recorder.py --verbose --port 5000 --airtime-conf /etc/airtime/airtime.conf --stream http://stream.radioangrezi.de:8000/live "%%Y/%%m/%%d/radio-angrezi-live-%%Y-%%m-%%d-%%H-%%M-%%S_%%label.wav"
 WorkingDirectory=/media/storage/recordings/Studio-Live/
 
 TimeoutStopSec=10

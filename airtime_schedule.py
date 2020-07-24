@@ -98,7 +98,7 @@ class AirtimeBroadcastRecording(AirtimeBroadcast):
             self.schedule_recording()
 
     def trigger_start(self, id, name):
-        logger.info("Start of recording was triggered.")
+        logger.debug("Start of recording was triggered.")
         try_to_remove_job(self.start_job)
         if AirtimeBroadcastRecording.recorder.running():
             logging.warning("Can not start scheduled rec. Recorder already running.")
@@ -108,7 +108,7 @@ class AirtimeBroadcastRecording(AirtimeBroadcast):
         try_to_remove_job(self.start_job)
 
     def trigger_end(self, id, name):
-        logger.info("End of recording was triggered.")
+        logger.debug("End of recording was triggered.")
         if AirtimeBroadcastRecording.recorder.running():
             AirtimeBroadcastRecording.recorder.stop()
             try_to_remove_job(self.end_job)
@@ -117,11 +117,11 @@ class AirtimeBroadcastRecording(AirtimeBroadcast):
 
     def schedule_recording(self, start=True, end=True):
         if not self.record:
-            raise logger.error("This broadcasts has no recording enabled. Skipping.")
+            logger.warning("This broadcasts has no recording enabled. Skipping.")
             return
 
         if self.end and self.start and (self.end - self.start < datetime.timedelta(seconds=10)):
-            raise logger.error("Scheduled recording will be shorter than 10 seconds. Aborting.")
+            logger.warning("Scheduled recording will be shorter than 10 seconds. Aborting.")
             return
 
         if start:
@@ -251,5 +251,5 @@ class AirtimeRecordingScheduler(object):
             logger.warning("Periodic update running already with job %s" % self.job.id)
             return
         self.job = scheduler.add_job(self.update, 'interval', seconds=SECONDS_RELOAD)
-        logger.info("Runing perodic update on job %s" % self.job.id)
+        logger.debug("Runing perodic update on job %s" % self.job.id)
 

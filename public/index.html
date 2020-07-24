@@ -11,6 +11,13 @@
 
         <script type="text/javascript">
 
+        function handleErrors(response) {
+            if (!response.ok) {
+                throw Error(response.status + " " +                 response.statusText);
+            }
+            return response;
+        }
+
         window.onload = function () {
 
             window.API_HOST = '/proxy/live-recorder' // no tailing slash /
@@ -33,6 +40,7 @@
 
                 update_status: function(){
                     fetch(window.API_HOST + '/status-summary/')
+                    .then(handleErrors)
                     .then((res) => {
                         return res.json().then(function (data) {
                             // on air light
@@ -53,7 +61,9 @@
                             
                         });
                     })
-                    .catch((error) => live_recorder.log("Live Rec: " + error))
+                    .catch((error) => {
+                        live_recorder.log(error)
+                    })
 
                 },
 
@@ -122,6 +132,7 @@
                 reset_recordning: function(){
 
                     fetch(window.API_HOST + '/recording-request-cut/')
+                    .then(handleErrors)
                     .then((res) => {
                         return res.text().then(function (text) {
                             live_recorder.status_elem.style = "background: #66FF00";
@@ -139,6 +150,7 @@
                         api_method = '/recording-start/'
                     }
                     fetch(window.API_HOST + api_method)
+                    .then(handleErrors)
                     .then((res) => {
                         return res.text().then(function (text) {
                             live_recorder.status_elem.style = "background: yellow";

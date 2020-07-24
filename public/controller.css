@@ -114,6 +114,8 @@ button, .button {
     border: none;
     height: 100px;
     max-width: 100%;
+    font-family: monospace;
+    font-size: 0.8em;
 }
 
 .status {

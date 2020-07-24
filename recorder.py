@@ -50,7 +50,7 @@ cors = CORS(app, resources={r"/*": {"origins": "*"}})
 werkzeug_log = logging.getLogger('werkzeug')
 werkzeug_log.setLevel(logging.WARNING)
 
-log = logging.getLogger(__name__)
+log = logging.getLogger('recorder')
 log.setLevel(logging.WARNING)
 
 parser = argparse.ArgumentParser(description=__doc__)
@@ -67,17 +67,22 @@ parser = argparse.ArgumentParser(description=__doc__)
 # parser.add_argument(
 #     '-t', '--subtype', type=str, help='sound file subtype (e.g. "PCM_24")')
 parser.add_argument(
-    '-s', '--stream', type=str,
-    help='Stream url to record with streamripper. Cant be used with --device.')
+    '-s', '--stream', required=True, type=str,
+    help='Stream url to record with streamripper.')
 parser.add_argument(
-    '-p', '--port', type=int, help='web server port for API requests. if empty server will not be started.')
+    '-p', '--port', type=int, required=True, help='web server port for API requests. If empty server will not be started.')
 parser.add_argument(
     '--debug', help='Output debug messages.', action='store_true')
+parser.add_argument(
+    '-v', '--verbose', help='Output info messages.', action='store_true')
 parser.add_argument(
     '--airtime-conf', type=str, help='Airtime config file to read. Usually: /etc/airtime/airtime.conf')
 parser.add_argument(
     'filename', nargs='?', metavar='FILENAME', help='audio file to store recording to. Use %station and %label to include metadata, strftime() codes for time.')
 args = parser.parse_args()
+
+if args.verbose:
+    log.setLevel(logging.INFO)
 
 if args.debug:
     log.setLevel(logging.DEBUG)
@@ -159,7 +164,7 @@ class StreamRecorderWithAirtime(object):
             self.name = slugify(name)
 
     def stop(self):
-        log.info("Recording stop called.")
+        log.debug("Recording stop called.")
         if not self.running(): return
         self.stop_recording()
         self.update_filename()
@@ -201,7 +206,7 @@ class StreamRecorderWithAirtime(object):
         filename = filename.strip(" _.")
         filename += self.extension
 
-        log.info('Recorder: Starting file ' + repr(filename))
+        log.info('File: ' + repr(filename))
 
         directory = os.path.dirname(filename) or os.getcwd()
         if not os.path.exists(directory):
@@ -214,7 +219,7 @@ class StreamRecorderWithAirtime(object):
         # alternative to streamripper: https://github.com/jpaille/streamripper
         # TODO add max duration
         # TODO remove .cue files
-        log.info('Recorder: Starting streamripper')
+        log.debug('Starting streamripper')
         self._filename = self.filename.replace('%', '') # make sure no tokens are left. otherwise we will not find the file again.
         # streamripper manpage: http://manpages.ubuntu.com/manpages/bionic/man1/streamripper.1.html
         self.__class__.process = subprocess.Popen([
@@ -240,10 +245,10 @@ class StreamRecorderWithAirtime(object):
 
     def stop_recording(self):
         if not self.running(): return
-        log.info('Recorder: Finishing file ' + repr(self._filename))
+        log.info('Finishing file ' + repr(self._filename))
         self.__class__.process.terminate()
         self.__class__.process.wait()
-        log.info('Recorder: Streamripper terminated.')
+        log.debug('Streamripper terminated.')
         # you can not get rid of the .cue, if you use the -a flag, which we need.
         try:
             os.system("rm *.cue")
@@ -380,7 +385,7 @@ if __name__ == "__main__":
     RECORDER = StreamRecorderWithAirtime(args.stream, args.filename)
     SCHEDULE = AirtimeRecordingScheduler(airtime_api, RECORDER)
 
-    log.info("Starting Webserver at %i" % port)
+    log.debug("Starting Webserver at %i" % port)
     # Do not use run(debug=True)! It will run a second instance of the process, thus a second scheduler etc.
     app.run(port=port, host='localhost')
 
