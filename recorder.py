@@ -193,6 +193,8 @@ class StreamRecorderWithAirtime(object):
 
         print(os.path.join(self.directory, self.filename))
         try:
+            log.debug("Current filename: " + os.path.join(self.directory, self._filename))
+            log.debug("New filename: " + os.path.join(self.directory, self.filename))
             os.rename(os.path.join(self.directory, self._filename), os.path.join(self.directory, self.filename))
             self._filename = self.filename
         except OSError:
