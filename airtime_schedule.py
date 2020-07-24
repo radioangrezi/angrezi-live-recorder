@@ -4,6 +4,8 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.base import JobLookupError
 import traceback, os
+import pytz
+from tzlocal import get_localzone
 
 scheduler = BackgroundScheduler(daemon=True)
 scheduler.start()
@@ -17,6 +19,14 @@ SECONDS_MIN_DURATION = 10
 
 assert SECONDS_WITHIN_START_IMMEDIATELY < SECONDS_RELOAD
 # otherwise you will miss some beginnings
+
+
+def now():
+    try:
+        localtz = get_localzone()
+    except:
+        localtz = pytz.UTC
+    return datetime.datetime.now().replace(tzinfo=localtz)
 
 
 class GenericBroadcast(object):
@@ -45,7 +55,8 @@ class AirtimeBroadcast(GenericBroadcast):
     # airtime_api.get_live_info()
     # airtime_api.get_on_air_light()
 
-    def __init__(self, r):
+    def __init__(self, r, timezone=pytz.UTC):
+        self.timezone = timezone
         self.load_dict(r)
 
     def load_dict(self, r):
@@ -53,7 +64,9 @@ class AirtimeBroadcast(GenericBroadcast):
         self._dict = r
 
         self.start = datetime.datetime.strptime(r['starts'], '%Y-%m-%d %H:%M:%S')
+        self.start = self.start.replace(tzinfo=self.timezone)
         self.end = datetime.datetime.strptime(r['ends'], '%Y-%m-%d %H:%M:%S')
+        self.end = self.end.replace(tzinfo=self.timezone)
         self.name = r['name']
         self.description = r['description']
         self.instance_id = int(r['instance_id'])
@@ -83,7 +96,7 @@ class AirtimeBroadcastRecording(AirtimeBroadcast):
 
     recorder = None
 
-    def __init__(self, r, now=False, auto_schedule_recording=True):
+    def __init__(self, r, now=False, auto_schedule_recording=True, timezone=pytz.UTC):
 
         self.start_job = None
         self.start_job_date = None
@@ -91,7 +104,7 @@ class AirtimeBroadcastRecording(AirtimeBroadcast):
         self.end_job_date = None
 
         # load dict to broadcast
-        super(AirtimeBroadcastRecording, self).__init__(r)
+        super(AirtimeBroadcastRecording, self).__init__(r, timezone)
 
         # autoschedule
         if auto_schedule_recording:
@@ -125,7 +138,7 @@ class AirtimeBroadcastRecording(AirtimeBroadcast):
             return
 
         if start:
-            if self.start < datetime.datetime.now() + datetime.timedelta(seconds=SECONDS_WITHIN_START_IMMEDIATELY):
+            if self.start < now() + datetime.timedelta(seconds=SECONDS_WITHIN_START_IMMEDIATELY):
                 # start immediately if start has passed or within 3 sec from now
                 self.trigger_start(id=self.id, name=self.name)
 
@@ -147,14 +160,14 @@ class AirtimeBroadcastRecording(AirtimeBroadcast):
                                                  kwargs={'id': self.get_unique_id(), 'name': self.name})
                 logger.info("End was scheduled at %s with job %s" % (str(self.end), str(self.end_job.name)))
 
-        if self.record and self.end < datetime.datetime.now():
+        if self.record and self.end < now():
             logger.info("Broadcast is stale. Un-Scheduling...")
             self.unschedule_and_stop_recording()
 
     def unschedule_and_stop_recording(self):
             try_to_remove_job(self.start_job)
             try_to_remove_job(self.end_job)
-            if self.start < datetime.datetime.now() and self.end >= datetime.datetime.now():
+            if self.start < now() and self.end >= now():
                 self.recorder.stop()
 
 # TODO listen to cancel() event on job via add_listener()?! to than cancel or stop recording
@@ -182,7 +195,7 @@ class AirtimeRecordingScheduler(object):
         def __getattr__(self, item):
             return getattr(self._broadcast, item)
 
-        def update(self, r, now=False, stop_stale=True, others=[]):
+        def update(self, r, now=False, stop_stale=True, others=[], timezone=pytz.UTC):
             previous_broadcast = self._broadcast
             was_slot_updated = False
 
@@ -200,7 +213,7 @@ class AirtimeRecordingScheduler(object):
                         broadcast.load_dict(r)
                     else:
                     # fully new broadcast
-                        broadcast = self.rec_class(r, auto_schedule_recording=False)
+                        broadcast = self.rec_class(r, auto_schedule_recording=False, timezone=timezone)
                         self.scheduled_broadcasts[id] = broadcast
                     self._broadcast = broadcast
                     was_slot_updated = True
@@ -243,8 +256,10 @@ class AirtimeRecordingScheduler(object):
         logger.debug("Updating schedule from Airtime using API")
         r = self._api.get_live_info()
 
-        self.current.update(r['currentShow'], now=True, others=[self.next])
-        self.next.update(r['nextShow'], others=[self.current])
+
+        self.airtime_timezone = pytz.timezone(r['timezone'])
+        self.current.update(r['currentShow'], now=True, others=[self.next], timezone=self.airtime_timezone)
+        self.next.update(r['nextShow'], others=[self.current], timezone=self.airtime_timezone)
 
     def schedule_update(self):
         if self.job:

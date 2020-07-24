@@ -21,3 +21,5 @@ sounddevice==0.3.13
 urllib3==1.25.8
 Werkzeug==0.15.4
 zipp==1.2.0
+pytz
+tzlocal
