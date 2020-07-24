@@ -26,7 +26,7 @@ def now():
         localtz = get_localzone()
     except:
         localtz = pytz.UTC
-    return datetime.datetime.now().replace(tzinfo=localtz)
+    return localtz.localize(datetime.datetime.now())
 
 
 class GenericBroadcast(object):
@@ -57,6 +57,7 @@ class AirtimeBroadcast(GenericBroadcast):
 
     def __init__(self, r, timezone=pytz.UTC):
         self.timezone = timezone
+        print(self.timezone)
         self.load_dict(r)
 
     def load_dict(self, r):
@@ -64,9 +65,9 @@ class AirtimeBroadcast(GenericBroadcast):
         self._dict = r
 
         self.start = datetime.datetime.strptime(r['starts'], '%Y-%m-%d %H:%M:%S')
-        self.start = self.start.replace(tzinfo=self.timezone)
+        self.start = self.timezone.localize(self.start)
         self.end = datetime.datetime.strptime(r['ends'], '%Y-%m-%d %H:%M:%S')
-        self.end = self.end.replace(tzinfo=self.timezone)
+        self.end = self.timezone.localize(self.end)
         self.name = r['name']
         self.description = r['description']
         self.instance_id = int(r['instance_id'])
@@ -255,7 +256,6 @@ class AirtimeRecordingScheduler(object):
     def update(self):
         logger.debug("Updating schedule from Airtime using API")
         r = self._api.get_live_info()
-
 
         self.airtime_timezone = pytz.timezone(r['timezone'])
         self.current.update(r['currentShow'], now=True, others=[self.next], timezone=self.airtime_timezone)
