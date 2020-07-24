@@ -147,6 +147,8 @@ class StreamRecorderWithAirtime(object):
         self.url = url
         url_name, self.extension = os.path.splitext(url)
         self.filename_pattern, filename_extension = os.path.splitext(filename_pattern)
+        if not self.extension:
+            self.extension = filename_extension
         self.station_name = slugify(unicode(urlparse(url).netloc))
 
         self.directory = None
