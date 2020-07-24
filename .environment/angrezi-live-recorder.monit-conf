@@ -1,0 +1,6 @@
+
+check process live-recorder
+        matching "smbd"
+        start program = "/usr/sbin/service angrezi-live-recorder start"
+        stop program = "/usr/sbin/service angrezi-live-recorder stop"
+        group radio
