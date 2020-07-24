@@ -196,7 +196,7 @@ class StreamRecorderWithAirtime(object):
             os.rename(os.path.join(self.directory, self._filename), os.path.join(self.directory, self.filename))
             self._filename = self.filename
         except OSError:
-            pass
+            log.warn("Could not rename file. Original file not found?")
 
     def generate_filename_and_directory(self, label='unnamed'):
         filename = self.filename_pattern
