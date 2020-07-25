@@ -73,7 +73,10 @@ class AirtimeBroadcast(GenericBroadcast):
         self.instance_id = int(r['instance_id'])
         self.id = int(r['id'])
         self.image_path = r['image_path']
-        self.record = bool(r['record'])
+        # We will record all shows. No matter what.
+        # Why? Libretime will not allow to schedule tracks for to-record shows.
+        # To simplify the workflow for now, we just record everything and leave the checkbox in LT unchecked.
+        self.record = True # bool(r['record'])
 
     def is_same_dict(self, compare_r):
         return self._dict == compare_r
