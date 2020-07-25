@@ -42,6 +42,7 @@ import subprocess
 from urllib.request import urlopen, urlparse
 import signal
 import sys
+import time
 from airtime_schedule import AirtimeRecordingScheduler, scheduler
 
 app = Flask(__name__)
@@ -255,7 +256,8 @@ class StreamRecorderWithAirtime(object):
         log.debug('Streamripper terminated.')
         # you can not get rid of the .cue, if you use the -a flag, which we need.
         try:
-            os.system("rm *.cue")
+            cue = os.path.join(self.directory, "*.cue")
+            os.system("rm %s" % cue)
         except:
             pass
 
@@ -395,9 +397,9 @@ if __name__ == "__main__":
 
     print("Shutting down...")
     RECORDER.stop()
-    try:
-        os.system("rm *.cue")
-    except OSError:
-        pass
+    # try:
+    #     os.system("rm *.cue")
+    # except OSError:
+    #     pass
 
     parser.exit(0)

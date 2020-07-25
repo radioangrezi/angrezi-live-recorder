@@ -16,6 +16,9 @@ logger.setLevel(logging.INFO)
 SECONDS_WITHIN_START_IMMEDIATELY = 3
 SECONDS_RELOAD = 5
 SECONDS_MIN_DURATION = 10
+SECONDS_PADDING = 0
+# SECONDS_PADDING = 5
+# Padding would only work if we can have multiple recorder instances.
 
 assert SECONDS_WITHIN_START_IMMEDIATELY < SECONDS_RELOAD
 # otherwise you will miss some beginnings
@@ -64,9 +67,9 @@ class AirtimeBroadcast(GenericBroadcast):
         # this is also used to update the dict later on
         self._dict = r
 
-        self.start = datetime.datetime.strptime(r['starts'], '%Y-%m-%d %H:%M:%S')
+        self.start = datetime.datetime.strptime(r['starts'], '%Y-%m-%d %H:%M:%S') - datetime.timedelta(seconds=SECONDS_PADDING)
         self.start = self.timezone.localize(self.start)
-        self.end = datetime.datetime.strptime(r['ends'], '%Y-%m-%d %H:%M:%S')
+        self.end = datetime.datetime.strptime(r['ends'], '%Y-%m-%d %H:%M:%S') + datetime.timedelta(seconds=SECONDS_PADDING)
         self.end = self.timezone.localize(self.end)
         self.name = r['name']
         self.description = r['description']
