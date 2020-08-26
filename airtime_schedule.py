@@ -127,7 +127,7 @@ class AirtimeBroadcastRecording(AirtimeBroadcast):
         if self.recorder.running():
             logging.warning("Can not start scheduled rec. Recorder already running.")
             return
-        self.recorder.start()
+        self.recorder.start(name=self.name)
         try_to_remove_job(self.start_job)
 
     def trigger_end(self, id, name):

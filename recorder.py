@@ -162,7 +162,7 @@ class StreamRecorderWithAirtime(object):
         self.generate_filename_and_directory(label='incomplete')
         self.record_stream_to_file()
         if not name:
-            self.name = get_show_name()
+            self.name = slugify(get_show_name())
         else:
             self.name = slugify(name)
 
