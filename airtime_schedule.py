@@ -11,7 +11,7 @@ scheduler = BackgroundScheduler(daemon=True)
 scheduler.start()
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 SECONDS_WITHIN_START_IMMEDIATELY = 3
 SECONDS_RELOAD = 5
@@ -101,14 +101,18 @@ def try_to_remove_job(job):
 
 class AirtimeBroadcastRecording(AirtimeBroadcast):
 
-    recorder = None
-
-    def __init__(self, r, now=False, auto_schedule_recording=True, timezone=pytz.UTC):
+    def __init__(self, r, url, filename, now=False, auto_schedule_recording=True, timezone=pytz.UTC):
 
         self.start_job = None
         self.start_job_date = None
         self.end_job = None
         self.end_job_date = None
+        self.url = url
+        self.filename = filename
+
+        from recorder import StreamRecorderWithAirtime
+
+        self.recorder = StreamRecorderWithAirtime(url, filename)
 
         # load dict to broadcast
         super(AirtimeBroadcastRecording, self).__init__(r, timezone)
@@ -120,17 +124,16 @@ class AirtimeBroadcastRecording(AirtimeBroadcast):
     def trigger_start(self, id, name):
         logger.debug("Start of recording was triggered.")
         try_to_remove_job(self.start_job)
-        if AirtimeBroadcastRecording.recorder.running():
+        if self.recorder.running():
             logging.warning("Can not start scheduled rec. Recorder already running.")
             return
-
-        AirtimeBroadcastRecording.recorder.start()
+        self.recorder.start()
         try_to_remove_job(self.start_job)
 
     def trigger_end(self, id, name):
         logger.debug("End of recording was triggered.")
-        if AirtimeBroadcastRecording.recorder.running():
-            AirtimeBroadcastRecording.recorder.stop()
+        if self.recorder.running():
+            self.recorder.stop()
             try_to_remove_job(self.end_job)
         else:
             raise RuntimeError("Can not stop scheduled rec. Recorder not running.")
@@ -191,13 +194,15 @@ class AirtimeBroadcastRecording(AirtimeBroadcast):
 
 class AirtimeRecordingScheduler(object):
 
+    url = None
+    filename = None
+
     class BroadcastSlot:
 
-        rec_class = AirtimeBroadcastRecording
         scheduled_broadcasts = dict()
 
-        def __init__(self, brodcast=None):
-            self._broadcast = brodcast
+        def __init__(self, broadcast=None):
+            self._broadcast = broadcast
 
         def __getattr__(self, item):
             return getattr(self._broadcast, item)
@@ -209,27 +214,35 @@ class AirtimeRecordingScheduler(object):
             if len(r) > 0 and  isinstance(r[0], dict):
                 # if broadcast is passed
                 r = r[0]
-                id = self.rec_class.get_unique_id_from_dict(r)
+                id = AirtimeBroadcastRecording.get_unique_id_from_dict(r)
                 if self._broadcast and self._broadcast.is_same_dict(r):
                     was_slot_updated = False
 
                 else:
                     # broadcast already exists but needs updating
+                    logger.debug("Broadcast already exists but needs updating.")
                     if id in self.scheduled_broadcasts:
                         broadcast = self.scheduled_broadcasts[id]
                         broadcast.load_dict(r)
+                        logger.debug("Existing show updated.")
                     else:
                     # fully new broadcast
-                        broadcast = self.rec_class(r, auto_schedule_recording=False, timezone=timezone)
+                        broadcast = AirtimeBroadcastRecording(r,
+                                                              url=AirtimeRecordingScheduler.url,
+                                                              filename=AirtimeRecordingScheduler.filename,
+                                                              auto_schedule_recording=False,
+                                                              timezone=timezone)
                         self.scheduled_broadcasts[id] = broadcast
+                        logger.debug("Fully new show processed.")
                     self._broadcast = broadcast
                     was_slot_updated = True
             else:
                 # no broadcast passed
+                # logger.debug("No Broadcast in slot.")
                 self._broadcast = None
                 if previous_broadcast and previous_broadcast not in others:
                     # stop stale / finished show and recordings
-                    logger.info("Un-Scheduling... %i %s" % (previous_broadcast.get_unique_id(), previous_broadcast.__repr__()))
+                    logger.info("Un-Scheduling show with ID %i" % (previous_broadcast.get_unique_id(),))
                     previous_broadcast.unschedule_and_stop_recording()
                     try:
                         del self.scheduled_broadcasts[previous_broadcast.get_unique_id()]
@@ -239,14 +252,15 @@ class AirtimeRecordingScheduler(object):
 
             if was_slot_updated and self._broadcast:
                 # schedule if we have changes
-                logger.info("Scheduling... %i %s" % (self._broadcast.get_unique_id(), self._broadcast.__repr__()))
+                logger.info("Scheduling show with ID %i" % (self._broadcast.get_unique_id(),))
                 self._broadcast.schedule_recording()
 
             return was_slot_updated
 
-    def __init__(self, airtime_api, recorder_instance):
+    def __init__(self, airtime_api, url, filename):
         self._api = airtime_api
-        AirtimeBroadcastRecording.recorder = recorder_instance
+        AirtimeRecordingScheduler.url = url
+        AirtimeRecordingScheduler.filename = filename
 
         # the API is not offering correct results on the previous show.
         # since we can not record past shows anyway we do not care.
@@ -260,12 +274,12 @@ class AirtimeRecordingScheduler(object):
 
 
     def update(self):
-        logger.debug("Updating schedule from Airtime using API")
+        # logger.debug("Updating schedule from Airtime using API")
         r = self._api.get_live_info()
 
         self.airtime_timezone = pytz.timezone(r['timezone'])
-        self.current.update(r['currentShow'], now=True, others=[self.next], timezone=self.airtime_timezone)
-        self.next.update(r['nextShow'], others=[self.current], timezone=self.airtime_timezone)
+        self.current.update(r['currentShow'], now=True, others=[self.next._broadcast], timezone=self.airtime_timezone)
+        self.next.update(r['nextShow'], others=[self.current._broadcast], timezone=self.airtime_timezone)
 
     def schedule_update(self):
         if self.job:

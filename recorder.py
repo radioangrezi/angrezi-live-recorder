@@ -389,7 +389,7 @@ if __name__ == "__main__":
     debug = args.debug or False
 
     RECORDER = StreamRecorderWithAirtime(args.stream, args.filename)
-    SCHEDULE = AirtimeRecordingScheduler(airtime_api, RECORDER)
+    SCHEDULE = AirtimeRecordingScheduler(airtime_api, url=args.stream, filename=args.filename)
 
     log.debug("Starting Webserver at %i" % port)
     # Do not use run(debug=True)! It will run a second instance of the process, thus a second scheduler etc.

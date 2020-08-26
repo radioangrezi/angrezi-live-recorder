@@ -187,8 +187,12 @@
                 <h2 class="module-label label">Studio Speicher XI (Master Source)</h2>
                 <p class="status module-row">IDLE</p>
             </section>-->
+            <section id="live-recorder-auto" class="box">
+                <h2 class="module-label label">Live Stream Recorder (Automatic)</h2>
+                <p>All scheduled shows will automatically record from stream to file. Currently it is not possible to check the recording status via this web interface. Sorry. <br/>Use <span style="font-family:monospace;">journalctl -u angrezi-live-recorder</span> via SSH instead.</p>
+            </section>
             <section id="live-recorder" class="box">
-                <h2 class="module-label label">Live Stream Recorder</h2>
+                <h2 class="module-label label">Live Stream Recorder (Manual)</h2>
 <!--                 <div class="module-row">
                     <fieldset>
                         <input type="radio" id="xi" name="source" value="studio-xi"/>
